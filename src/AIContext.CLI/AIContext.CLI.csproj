@@ -9,7 +9,11 @@
     <PackageProjectUrl>https://github.com/aicontext-dev/aicontext</PackageProjectUrl>
     <RepositoryUrl>https://github.com/aicontext-dev/aicontext</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 </Project>
