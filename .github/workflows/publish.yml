@@ -1,0 +1,29 @@
+name: Publish NuGet Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Pack AIContext
+        run: dotnet pack src/AIContext/AIContext.csproj -c Release
+
+      - name: Pack AIContext.CLI
+        run: dotnet pack src/AIContext.CLI/AIContext.CLI.csproj -c Release
+
+      - name: Pack AIContext.Spec
+        run: dotnet pack src/AIContext.Spec/AIContext.Spec.csproj -c Release
+
+      - name: Push to NuGet
+        run: dotnet nuget push **/*.nupkg --source https://api.nuget.org/v3/index.json
