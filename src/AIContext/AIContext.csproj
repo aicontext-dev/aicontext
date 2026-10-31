@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>AIContext</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>aicontext.dev</Authors>
+    <Description>Open format standard for AI coding assistant project context. Specification and tooling coming soon.</Description>
+    <PackageTags>ai;context;copilot;cursor;claude;llm;developer-tools;standard</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/aicontext-dev/aicontext</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/aicontext-dev/aicontext</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

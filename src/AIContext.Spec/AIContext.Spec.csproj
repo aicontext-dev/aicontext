@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>AIContext.Spec</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>aicontext.dev</Authors>
+    <Description>Specification types and JSON schema for the AIContext open format standard. Coming soon.</Description>
+    <PackageTags>ai;context;copilot;cursor;claude;llm;developer-tools;spec;schema</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/aicontext-dev/aicontext</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/aicontext-dev/aicontext</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
