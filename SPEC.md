@@ -202,6 +202,8 @@ Specification changes SHOULD use an RFC-like process:
 3. Pull request updating `SPEC.md` and related schema
 4. Version bump and changelog update
 
+Repository governance details are documented in `GOVERNANCE.md`.
+
 ## 12. Non-goals (v0.1)
 
 v0.1 does not define:
@@ -234,4 +236,3 @@ Planned command surface:
 - `aicontext diff`
 
 This section is informative only; command behavior is defined by tooling implementation, not by the file format itself.
-

@@ -1,0 +1,28 @@
+name: Validate AIContext
+
+on:
+  push:
+    paths:
+      - '.aicontext/**'
+      - 'schema/**'
+      - 'scripts/validate-aicontext.ps1'
+      - 'SPEC.md'
+      - '.github/workflows/validate-aicontext.yml'
+  pull_request:
+    paths:
+      - '.aicontext/**'
+      - 'schema/**'
+      - 'scripts/validate-aicontext.ps1'
+      - 'SPEC.md'
+      - '.github/workflows/validate-aicontext.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate .aicontext
+        shell: pwsh
+        run: ./scripts/validate-aicontext.ps1
