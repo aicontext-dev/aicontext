@@ -17,3 +17,5 @@ All notable changes to the AIContext specification repository will be documented
 - Schema usage section in [README.md](./README.md) with canonical `$schema` URL example.
 - Issue templates for bug reports, spec changes, and RFC proposals under [ISSUE_TEMPLATE](./.github/ISSUE_TEMPLATE/).
 - Pull request CI workflow in [pr-checks.yml](./.github/workflows/pr-checks.yml) for context validation and .NET build checks.
+- CLI MVP `init` and `validate` commands in [Program.cs](./src/AIContext.CLI/Program.cs).
+- CLI project converted to executable app in [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj).

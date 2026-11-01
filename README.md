@@ -53,6 +53,13 @@ CI workflow:
 
 - [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml)
 
+## CLI (MVP)
+
+Current commands:
+
+- `aicontext init [--path <directory>] [--name <project-name>] [--force]`
+- `aicontext validate [--path <directory>]`
+
 ## Website
 
 GitHub Pages deployment workflow:
