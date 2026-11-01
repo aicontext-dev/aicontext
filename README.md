@@ -60,7 +60,8 @@ Current commands:
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
 - `aicontext validate [--path <directory>]`
 - `aicontext export --target agents [--path <directory>]`
-- `aicontext export --target all [--path <directory>]` (scaffold: generates `agents`, warns for pending targets)
+- `aicontext export --target copilot [--path <directory>]`
+- `aicontext export --target all [--path <directory>]` (scaffold: generates `agents` + `copilot`, warns for pending targets)
 
 ## Website
 
