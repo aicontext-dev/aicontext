@@ -2,6 +2,19 @@
 
 All notable changes to the AIContext specification repository will be documented in this file.
 
+## [0.2.0] - 2026-11-01
+
+### Changed
+
+- NuGet package versions bumped to `0.2.0` in [AIContext.csproj](./src/AIContext/AIContext.csproj), [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj), and [AIContext.Spec.csproj](./src/AIContext.Spec/AIContext.Spec.csproj).
+- `aicontext export --target all` now resolves target list from `exports.targets` in `.aicontext/context.json` and falls back to all supported targets when not configured.
+- CLI package is configured as an installable .NET tool with command name `aicontext`.
+
+### Added
+
+- Export target resolution helper in [ExportTargetResolver.cs](./src/AIContext/ExportTargetResolver.cs).
+- Unit tests for target resolution behavior in [ExportTargetResolverTests.cs](./tests/AIContext.Tests/ExportTargetResolverTests.cs).
+
 ## [0.1.0-draft] - 2026-11-01
 
 ### Added
