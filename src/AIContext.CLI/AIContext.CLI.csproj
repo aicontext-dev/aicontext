@@ -3,7 +3,7 @@
     <PackageId>AIContext.CLI</PackageId>
     <Version>0.1.0</Version>
     <Authors>aicontext.dev</Authors>
-    <Description>CLI tool for the AIContext open format standard. Coming soon.</Description>
+    <Description>CLI tool for the AIContext open format standard.</Description>
     <PackageTags>ai;context;copilot;cursor;claude;llm;developer-tools;cli</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/aicontext-dev/aicontext</PackageProjectUrl>
@@ -11,6 +11,8 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>aicontext</ToolCommandName>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -28,6 +28,7 @@ All notable changes to the AIContext specification repository will be documented
 - Additional export target: `aider` output to [CONVENTIONS.md](./CONVENTIONS.md).
 - Export rendering logic extracted to core library in [ContextExporter.cs](./src/AIContext/ContextExporter.cs).
 - Validation logic extracted to core library in [ContextValidator.cs](./src/AIContext/ContextValidator.cs).
+- CLI package configured as installable .NET tool (`dotnet tool install --global AIContext.CLI`) in [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj).
 - New test project [AIContext.Tests](./tests/AIContext.Tests/AIContext.Tests.csproj) with exporter coverage.
 - Added validation rule tests in [ContextValidatorTests.cs](./tests/AIContext.Tests/ContextValidatorTests.cs).
 - PR workflow now runs tests in [pr-checks.yml](./.github/workflows/pr-checks.yml).

@@ -2,6 +2,18 @@
 
 Open format standard for AI coding assistant project context.
 
+Install:
+
+```powershell
+dotnet tool install --global AIContext.CLI
+```
+
+Run:
+
+```powershell
+aicontext --help
+```
+
 Available commands:
 
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`

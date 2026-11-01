@@ -61,6 +61,24 @@ dotnet test .\tests\AIContext.Tests\AIContext.Tests.csproj -c Release
 
 ## CLI (MVP)
 
+Install as a .NET tool:
+
+```powershell
+dotnet tool install --global AIContext.CLI
+```
+
+Update:
+
+```powershell
+dotnet tool update --global AIContext.CLI
+```
+
+Run:
+
+```powershell
+aicontext --help
+```
+
 Current commands:
 
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
