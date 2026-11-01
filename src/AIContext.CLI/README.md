@@ -8,6 +8,7 @@ Available commands:
 - `aicontext validate [--path <directory>]`
 - `aicontext export --target agents [--path <directory>]`
 - `aicontext export --target copilot [--path <directory>]`
+- `aicontext export --target claude [--path <directory>]`
 - `aicontext export --target all [--path <directory>]` (scaffold)
 
 See https://github.com/aicontext-dev/aicontext for updates.
