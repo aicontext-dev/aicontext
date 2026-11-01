@@ -79,6 +79,17 @@ Run:
 aicontext --help
 ```
 
+Quickstart:
+
+```powershell
+aicontext init --name my-project
+aicontext validate
+aicontext export --target all
+```
+
+Note:
+- `export --target all` uses `exports.targets` from `.aicontext/context.json` when configured.
+
 Current commands:
 
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
