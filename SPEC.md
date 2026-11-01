@@ -114,7 +114,7 @@ Extended example:
     "stack": [".NET 9", "EF Core", "React", "PostgreSQL"]
   },
   "exports": {
-    "targets": ["agents", "copilot", "claude", "cursor", "windsurf"],
+    "targets": ["agents", "copilot", "claude", "cursor", "windsurf", "aider"],
     "defaultTarget": "all"
   },
   "metadata": {
