@@ -59,6 +59,7 @@ Current commands:
 
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
 - `aicontext validate [--path <directory>]`
+- `aicontext export --target agents [--path <directory>]`
 
 ## Website
 

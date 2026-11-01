@@ -19,3 +19,4 @@ All notable changes to the AIContext specification repository will be documented
 - Pull request CI workflow in [pr-checks.yml](./.github/workflows/pr-checks.yml) for context validation and .NET build checks.
 - CLI MVP `init` and `validate` commands in [Program.cs](./src/AIContext.CLI/Program.cs).
 - CLI project converted to executable app in [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj).
+- CLI `export --target agents` command to generate [AGENTS.md](./AGENTS.md) from `.aicontext` content.
