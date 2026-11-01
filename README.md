@@ -64,7 +64,8 @@ Current commands:
 - `aicontext export --target claude [--path <directory>]`
 - `aicontext export --target cursor [--path <directory>]`
 - `aicontext export --target windsurf [--path <directory>]`
-- `aicontext export --target all [--path <directory>]` (scaffold: generates `agents` + `copilot` + `claude` + `cursor` + `windsurf`, warns for pending targets)
+- `aicontext export --target aider [--path <directory>]`
+- `aicontext export --target all [--path <directory>]` (generates `agents` + `copilot` + `claude` + `cursor` + `windsurf` + `aider`)
 
 ## Website
 

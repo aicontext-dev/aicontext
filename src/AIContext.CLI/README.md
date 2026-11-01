@@ -11,6 +11,7 @@ Available commands:
 - `aicontext export --target claude [--path <directory>]`
 - `aicontext export --target cursor [--path <directory>]`
 - `aicontext export --target windsurf [--path <directory>]`
-- `aicontext export --target all [--path <directory>]` (scaffold)
+- `aicontext export --target aider [--path <directory>]`
+- `aicontext export --target all [--path <directory>]`
 
 See https://github.com/aicontext-dev/aicontext for updates.
