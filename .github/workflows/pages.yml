@@ -37,6 +37,7 @@ jobs:
           mkdir -p _site/spec
           mkdir -p _site/schema/v1
           cp docs/index.html _site/index.html
+          cp docs/CNAME _site/CNAME
           cp docs/spec/index.html _site/spec/index.html
           cp README.md _site/README.md
           cp SPEC.md _site/SPEC.md
