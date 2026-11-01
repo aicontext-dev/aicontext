@@ -4,7 +4,7 @@
 > One source of truth. Every AI tool.
 
 **Specification and tooling — work in progress.**
-Coming soon. ⭐ Watch/Star this repo for updates.
+⭐ Watch/Star this repo for updates.
 
 ## What is this?
 
@@ -12,3 +12,7 @@ Coming soon. ⭐ Watch/Star this repo for updates.
 project knowledge that AI coding assistants can use.
 
 Works with: GitHub Copilot · Cursor · Claude Code · Windsurf · Aider
+
+## Specification
+
+First public draft is available in [SPEC.md](./SPEC.md).
