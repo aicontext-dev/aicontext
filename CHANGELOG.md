@@ -20,7 +20,7 @@ All notable changes to the AIContext specification repository will be documented
 - CLI MVP `init` and `validate` commands in [Program.cs](./src/AIContext.CLI/Program.cs).
 - CLI project converted to executable app in [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj).
 - CLI `export --target agents` command to generate [AGENTS.md](./AGENTS.md) from `.aicontext` content.
-- CLI `export --target all` that generates `agents` + `copilot` + `claude` + `cursor` + `windsurf` + `aider` outputs.
+- CLI `export --target all` now respects `exports.targets` in `.aicontext/context.json` (falls back to all supported targets when unset).
 - First real additional export target: `copilot` output to [.github/copilot-instructions.md](./.github/copilot-instructions.md).
 - Additional export target: `claude` output to [CLAUDE.md](./CLAUDE.md).
 - Additional export target: `cursor` output to [.cursor/rules/project.mdc](./.cursor/rules/project.mdc).

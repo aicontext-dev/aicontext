@@ -5,7 +5,7 @@ using AIContext;
 
 const string CanonicalSchemaUrl = "https://aicontext.dev/schema/v1/context.schema.json";
 const string ExpectedSpecVersion = "0.1.0";
-var allowedTargets = new HashSet<string>(StringComparer.Ordinal)
+string[] supportedTargets =
 {
     "agents",
     "copilot",
@@ -14,6 +14,7 @@ var allowedTargets = new HashSet<string>(StringComparer.Ordinal)
     "windsurf",
     "aider"
 };
+var allowedTargets = new HashSet<string>(supportedTargets, StringComparer.Ordinal);
 
 if (args.Length == 0 || IsHelp(args[0]))
 {
@@ -152,21 +153,12 @@ int RunExport(Dictionary<string, string?> options)
         return 1;
     }
 
-    if (!string.Equals(target, "agents", StringComparison.Ordinal) &&
-        !string.Equals(target, "copilot", StringComparison.Ordinal) &&
-        !string.Equals(target, "claude", StringComparison.Ordinal) &&
-        !string.Equals(target, "cursor", StringComparison.Ordinal) &&
-        !string.Equals(target, "windsurf", StringComparison.Ordinal) &&
-        !string.Equals(target, "aider", StringComparison.Ordinal) &&
-        !string.Equals(target, "all", StringComparison.Ordinal))
+    if (!string.Equals(target, "all", StringComparison.Ordinal) &&
+        !allowedTargets.Contains(target))
     {
-        Console.Error.WriteLine($"Unsupported export target '{target}'. Supported targets: agents, copilot, claude, cursor, windsurf, aider, all");
+        Console.Error.WriteLine($"Unsupported export target '{target}'. Supported targets: {string.Join(", ", supportedTargets)}, all");
         return 1;
     }
-
-    var requestedTargets = string.Equals(target, "all", StringComparison.Ordinal)
-        ? new List<string> { "agents", "copilot", "claude", "cursor", "windsurf", "aider" }
-        : new List<string> { target };
 
     var contextDirectory = Path.Combine(basePath, ".aicontext");
     var readmePath = Path.Combine(contextDirectory, "README.md");
@@ -194,6 +186,24 @@ int RunExport(Dictionary<string, string?> options)
     {
         Console.Error.WriteLine($"Invalid JSON in {contextPath}. {ex.Message}");
         return 1;
+    }
+
+    List<string> requestedTargets;
+    if (string.Equals(target, "all", StringComparison.Ordinal))
+    {
+        var targetResolution = ExportTargetResolver.ResolveTargetsForAll(root, supportedTargets, allowedTargets);
+        if (targetResolution.Error is not null)
+        {
+            Console.Error.WriteLine($"Invalid exports.targets configuration in {contextPath}: {targetResolution.Error}");
+            Console.Error.WriteLine("Run 'aicontext validate' to see full details.");
+            return 1;
+        }
+
+        requestedTargets = targetResolution.Targets;
+    }
+    else
+    {
+        requestedTargets = new List<string> { target };
     }
 
     if (!root.TryGetProperty("project", out var project) ||

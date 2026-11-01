@@ -71,7 +71,7 @@ Current commands:
 - `aicontext export --target cursor [--path <directory>]`
 - `aicontext export --target windsurf [--path <directory>]`
 - `aicontext export --target aider [--path <directory>]`
-- `aicontext export --target all [--path <directory>]` (generates `agents` + `copilot` + `claude` + `cursor` + `windsurf` + `aider`)
+- `aicontext export --target all [--path <directory>]` (generates targets from `exports.targets`; if not set, generates all supported targets)
 
 ## Website
 
