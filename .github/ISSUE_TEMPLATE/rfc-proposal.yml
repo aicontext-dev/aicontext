@@ -1,0 +1,41 @@
+name: RFC proposal
+description: Propose a normative RFC-level change.
+title: "RFC: "
+labels:
+  - rfc
+  - spec
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for normative changes as described in GOVERNANCE.md.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and motivation
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed specification change
+      description: Include exact behavior and affected sections/files.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration and compatibility
+      description: Explain compatibility and required migration for implementers.
+    validations:
+      required: true

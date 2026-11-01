@@ -21,6 +21,26 @@ Schema: [schema/v1/context.schema.json](./schema/v1/context.schema.json)
 Governance: [GOVERNANCE.md](./GOVERNANCE.md)  
 Changelog: [CHANGELOG.md](./CHANGELOG.md)
 
+## How to use schema
+
+Use the canonical schema URL in your `.aicontext/context.json`:
+
+```json
+{
+  "$schema": "https://aicontext.dev/schema/v1/context.schema.json",
+  "specVersion": "0.1.0",
+  "project": {
+    "name": "my-project"
+  }
+}
+```
+
+Then validate locally:
+
+```powershell
+.\scripts\validate-aicontext.ps1
+```
+
 ## Validation
 
 Local validation command:
@@ -41,4 +61,4 @@ GitHub Pages deployment workflow:
 
 Expected site URL:
 
-- https://aicontext-dev.github.io/aicontext/
+- https://aicontext.dev/

@@ -1,0 +1,39 @@
+name: Spec change
+description: Propose a change to AIContext specification or schema.
+title: "spec: "
+labels:
+  - spec
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem does this change solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the exact change to spec/schema.
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Is this patch/minor/major? Any migration needed?
+      placeholder: |
+        Version impact:
+        Migration impact:
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

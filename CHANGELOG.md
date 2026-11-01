@@ -14,3 +14,6 @@ All notable changes to the AIContext specification repository will be documented
 - GitHub Actions validation workflow in [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml).
 - GitHub Pages deployment workflow in [pages.yml](./.github/workflows/pages.yml).
 - Initial website pages in [docs/index.html](./docs/index.html) and [docs/spec/index.html](./docs/spec/index.html).
+- Schema usage section in [README.md](./README.md) with canonical `$schema` URL example.
+- Issue templates for bug reports, spec changes, and RFC proposals under [ISSUE_TEMPLATE](./.github/ISSUE_TEMPLATE/).
+- Pull request CI workflow in [pr-checks.yml](./.github/workflows/pr-checks.yml) for context validation and .NET build checks.
