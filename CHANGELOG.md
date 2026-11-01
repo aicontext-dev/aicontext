@@ -26,3 +26,6 @@ All notable changes to the AIContext specification repository will be documented
 - Additional export target: `cursor` output to [.cursor/rules/project.mdc](./.cursor/rules/project.mdc).
 - Additional export target: `windsurf` output to [.windsurf/rules/project.md](./.windsurf/rules/project.md).
 - Additional export target: `aider` output to [CONVENTIONS.md](./CONVENTIONS.md).
+- Export rendering logic extracted to core library in [ContextExporter.cs](./src/AIContext/ContextExporter.cs).
+- New test project [AIContext.Tests](./tests/AIContext.Tests/AIContext.Tests.csproj) with exporter coverage.
+- PR workflow now runs tests in [pr-checks.yml](./.github/workflows/pr-checks.yml).

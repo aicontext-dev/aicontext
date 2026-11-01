@@ -30,3 +30,16 @@ jobs:
           dotnet build src/AIContext/AIContext.csproj -c Release
           dotnet build src/AIContext.CLI/AIContext.CLI.csproj -c Release
           dotnet build src/AIContext.Spec/AIContext.Spec.csproj -c Release
+
+  test-dotnet-projects:
+    runs-on: ubuntu-latest
+    needs: build-dotnet-projects
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Run AIContext tests
+        run: dotnet test tests/AIContext.Tests/AIContext.Tests.csproj -c Release

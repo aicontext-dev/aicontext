@@ -53,6 +53,12 @@ CI workflow:
 
 - [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml)
 
+Test command:
+
+```powershell
+dotnet test .\tests\AIContext.Tests\AIContext.Tests.csproj -c Release
+```
+
 ## CLI (MVP)
 
 Current commands:

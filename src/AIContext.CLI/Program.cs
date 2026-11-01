@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using AIContext;
 
 const string CanonicalSchemaUrl = "https://aicontext.dev/schema/v1/context.schema.json";
 const string ExpectedSpecVersion = "0.1.0";
@@ -240,14 +241,14 @@ int RunExport(Dictionary<string, string?> options)
         projectName = new DirectoryInfo(basePath).Name;
     }
 
-    var readme = NormalizeReadmeForAgents(File.ReadAllText(readmePath));
+    var readme = File.ReadAllText(readmePath);
     var architecture = ReadOptionalContextSection(contextDirectory, "architecture.md");
     var decisions = ReadOptionalContextSection(contextDirectory, "decisions.md");
     var patterns = ReadOptionalContextSection(contextDirectory, "patterns.md");
     var constraints = ReadOptionalContextSection(contextDirectory, "constraints.md");
     var glossary = ReadOptionalContextSection(contextDirectory, "glossary.md");
 
-    var exportContext = new ExportContext(
+    var exportContext = new AIContext.ExportContext(
         projectName,
         readme,
         architecture,
@@ -265,7 +266,7 @@ int RunExport(Dictionary<string, string?> options)
         if (string.Equals(requestedTarget, "agents", StringComparison.Ordinal))
         {
             var outputPath = Path.Combine(basePath, "AGENTS.md");
-            var content = BuildAgentsMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildAgents(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -277,7 +278,7 @@ int RunExport(Dictionary<string, string?> options)
             var copilotDirectory = Path.Combine(basePath, ".github");
             Directory.CreateDirectory(copilotDirectory);
             var outputPath = Path.Combine(copilotDirectory, "copilot-instructions.md");
-            var content = BuildCopilotMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildCopilot(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -287,7 +288,7 @@ int RunExport(Dictionary<string, string?> options)
         if (string.Equals(requestedTarget, "claude", StringComparison.Ordinal))
         {
             var outputPath = Path.Combine(basePath, "CLAUDE.md");
-            var content = BuildClaudeMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildClaude(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -299,7 +300,7 @@ int RunExport(Dictionary<string, string?> options)
             var cursorRulesDirectory = Path.Combine(basePath, ".cursor", "rules");
             Directory.CreateDirectory(cursorRulesDirectory);
             var outputPath = Path.Combine(cursorRulesDirectory, "project.mdc");
-            var content = BuildCursorMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildCursor(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -311,7 +312,7 @@ int RunExport(Dictionary<string, string?> options)
             var windsurfRulesDirectory = Path.Combine(basePath, ".windsurf", "rules");
             Directory.CreateDirectory(windsurfRulesDirectory);
             var outputPath = Path.Combine(windsurfRulesDirectory, "project.md");
-            var content = BuildWindsurfMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildWindsurf(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -321,7 +322,7 @@ int RunExport(Dictionary<string, string?> options)
         if (string.Equals(requestedTarget, "aider", StringComparison.Ordinal))
         {
             var outputPath = Path.Combine(basePath, "CONVENTIONS.md");
-            var content = BuildAiderMarkdown(exportContext, generatedAt);
+            var content = ContextExporter.BuildAider(exportContext, generatedAt);
             File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
             Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
             generatedCount++;
@@ -531,162 +532,6 @@ static string? ReadOptionalContextSection(string contextDirectory, string fileNa
     return string.IsNullOrWhiteSpace(content) ? null : content;
 }
 
-static string BuildAgentsMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var builder = new StringBuilder();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target agents -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine($"# {exportContext.ProjectName}");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string BuildCopilotMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var builder = new StringBuilder();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target copilot -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine($"# Copilot Instructions for {exportContext.ProjectName}");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string BuildClaudeMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var builder = new StringBuilder();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target claude -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine($"# CLAUDE Instructions for {exportContext.ProjectName}");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string BuildCursorMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var escapedProjectName = EscapeYamlDoubleQuoted(exportContext.ProjectName);
-
-    var builder = new StringBuilder();
-    builder.AppendLine("---");
-    builder.AppendLine($"description: \"Project constraints and patterns for {escapedProjectName}\"");
-    builder.AppendLine("alwaysApply: true");
-    builder.AppendLine("---");
-    builder.AppendLine();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target cursor -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string BuildWindsurfMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var builder = new StringBuilder();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target windsurf -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine($"# Windsurf Rules for {exportContext.ProjectName}");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string BuildAiderMarkdown(ExportContext exportContext, string generatedAt)
-{
-    var builder = new StringBuilder();
-    builder.AppendLine("<!-- Auto-generated by aicontext export --target aider -->");
-    builder.AppendLine($"<!-- Source: .aicontext/ | Generated: {generatedAt} | Do not edit directly -->");
-    builder.AppendLine();
-    builder.AppendLine($"# Aider Conventions for {exportContext.ProjectName}");
-    builder.AppendLine();
-    builder.AppendLine(exportContext.ReadmeContent);
-
-    AppendSection(builder, "Architecture", exportContext.Architecture);
-    AppendSection(builder, "Key Decisions", exportContext.Decisions);
-    AppendSection(builder, "Coding Patterns", exportContext.Patterns);
-    AppendSection(builder, "Constraints", exportContext.Constraints);
-    AppendSection(builder, "Glossary", exportContext.Glossary);
-
-    return builder.ToString().TrimEnd();
-}
-
-static string EscapeYamlDoubleQuoted(string value)
-{
-    return value.Replace("\\", "\\\\", StringComparison.Ordinal)
-        .Replace("\"", "\\\"", StringComparison.Ordinal);
-}
-
-static string NormalizeReadmeForAgents(string readmeContent)
-{
-    var lines = readmeContent
-        .Replace("\r\n", "\n", StringComparison.Ordinal)
-        .Split('\n')
-        .ToList();
-
-    if (lines.Count > 0 && lines[0].StartsWith("# ", StringComparison.Ordinal))
-    {
-        lines.RemoveAt(0);
-        while (lines.Count > 0 && string.IsNullOrWhiteSpace(lines[0]))
-        {
-            lines.RemoveAt(0);
-        }
-    }
-
-    return string.Join(Environment.NewLine, lines).Trim();
-}
-
-static void AppendSection(StringBuilder builder, string title, string? content)
-{
-    if (string.IsNullOrWhiteSpace(content))
-    {
-        return;
-    }
-
-    builder.AppendLine();
-    builder.AppendLine($"## {title}");
-    builder.AppendLine(content);
-}
-
 static (Dictionary<string, string?> Values, string? Error) ParseOptions(string[] args)
 {
     var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
@@ -730,12 +575,3 @@ static void PrintHelp()
     Console.WriteLine("  aicontext validate [--path <directory>]");
     Console.WriteLine("  aicontext export --target <agents|copilot|claude|cursor|windsurf|aider|all> [--path <directory>]");
 }
-
-sealed record ExportContext(
-    string ProjectName,
-    string ReadmeContent,
-    string? Architecture,
-    string? Decisions,
-    string? Patterns,
-    string? Constraints,
-    string? Glossary);
