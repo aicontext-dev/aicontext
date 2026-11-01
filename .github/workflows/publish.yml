@@ -17,6 +17,12 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: NuGet login (Trusted Publishing)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: aicontext-dev
+
       - name: Pack all projects
         run: |
           dotnet pack src/AIContext/AIContext.csproj -c Release -o ./nupkgs
@@ -26,5 +32,5 @@ jobs:
       - name: Push to NuGet
         run: |
           for f in ./nupkgs/*.nupkg; do
-            dotnet nuget push "$f" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+            dotnet nuget push "$f" --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --skip-duplicate
           done

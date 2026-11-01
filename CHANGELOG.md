@@ -9,6 +9,7 @@ All notable changes to the AIContext specification repository will be documented
 - NuGet package versions bumped to `0.2.0` in [AIContext.csproj](./src/AIContext/AIContext.csproj), [AIContext.CLI.csproj](./src/AIContext.CLI/AIContext.CLI.csproj), and [AIContext.Spec.csproj](./src/AIContext.Spec/AIContext.Spec.csproj).
 - `aicontext export --target all` now resolves target list from `exports.targets` in `.aicontext/context.json` and falls back to all supported targets when not configured.
 - CLI package is configured as an installable .NET tool with command name `aicontext`.
+- NuGet publish workflow switched to Trusted Publishing (OIDC via `NuGet/login@v1`) and no longer uses a long-lived `NUGET_API_KEY` secret.
 
 ### Added
 
