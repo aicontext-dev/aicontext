@@ -12,3 +12,5 @@ All notable changes to the AIContext specification repository will be documented
 - Initial repository `.aicontext` example files in [README.md](./.aicontext/README.md) and [context.json](./.aicontext/context.json).
 - Validation script for local/CI checks in [validate-aicontext.ps1](./scripts/validate-aicontext.ps1).
 - GitHub Actions validation workflow in [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml).
+- GitHub Pages deployment workflow in [pages.yml](./.github/workflows/pages.yml).
+- Initial website pages in [docs/index.html](./docs/index.html) and [docs/spec/index.html](./docs/spec/index.html).

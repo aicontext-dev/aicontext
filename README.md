@@ -32,3 +32,13 @@ Local validation command:
 CI workflow:
 
 - [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml)
+
+## Website
+
+GitHub Pages deployment workflow:
+
+- [pages.yml](./.github/workflows/pages.yml)
+
+Expected site URL:
+
+- https://aicontext-dev.github.io/aicontext/

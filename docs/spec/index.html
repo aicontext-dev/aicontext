@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIContext Specification</title>
+  <style>
+    body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 40px auto; max-width: 900px; line-height: 1.6; padding: 0 16px; color: #111; }
+    h1 { margin-bottom: 0.2em; }
+    .sub { color: #555; margin-top: 0; }
+    ul { padding-left: 20px; }
+    code { background: #f2f2f2; padding: 2px 6px; border-radius: 4px; }
+    a { color: #0969da; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <p><a href="../">← AIContext Home</a></p>
+  <h1>AIContext Specification</h1>
+  <p class="sub">Current version: <strong>0.1.0-draft</strong></p>
+
+  <p>
+    AIContext defines an open, tool-agnostic project context format for AI coding assistants.
+  </p>
+
+  <h2>Documents</h2>
+  <ul>
+    <li><a href="../SPEC.md">SPEC.md</a></li>
+    <li><a href="../schema/v1/context.schema.json">schema/v1/context.schema.json</a></li>
+    <li><a href="../GOVERNANCE.md">GOVERNANCE.md</a></li>
+    <li><a href="../CHANGELOG.md">CHANGELOG.md</a></li>
+  </ul>
+
+  <h2>Core profile</h2>
+  <ul>
+    <li><code>.aicontext/README.md</code> exists and is non-empty</li>
+    <li><code>.aicontext/context.json</code> exists and passes schema validation</li>
+  </ul>
+</body>
+</html>
