@@ -189,16 +189,20 @@ int RunExport(Dictionary<string, string?> options)
         return 1;
     }
 
-    if (!string.Equals(target, "agents", StringComparison.Ordinal))
+    if (!string.Equals(target, "agents", StringComparison.Ordinal) &&
+        !string.Equals(target, "all", StringComparison.Ordinal))
     {
-        Console.Error.WriteLine($"Unsupported export target '{target}'. Supported target: agents");
+        Console.Error.WriteLine($"Unsupported export target '{target}'. Supported targets: agents, all");
         return 1;
     }
+
+    var requestedTargets = string.Equals(target, "all", StringComparison.Ordinal)
+        ? new List<string> { "agents", "copilot", "claude", "cursor", "windsurf", "aider" }
+        : new List<string> { "agents" };
 
     var contextDirectory = Path.Combine(basePath, ".aicontext");
     var readmePath = Path.Combine(contextDirectory, "README.md");
     var contextPath = Path.Combine(contextDirectory, "context.json");
-    var outputPath = Path.Combine(basePath, "AGENTS.md");
 
     if (!File.Exists(readmePath))
     {
@@ -247,8 +251,38 @@ int RunExport(Dictionary<string, string?> options)
         constraints,
         glossary);
 
-    File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
-    Console.WriteLine($"Generated: {outputPath}");
+    var generatedCount = 0;
+    var notImplemented = new List<string>();
+    foreach (var requestedTarget in requestedTargets)
+    {
+        if (string.Equals(requestedTarget, "agents", StringComparison.Ordinal))
+        {
+            var outputPath = Path.Combine(basePath, "AGENTS.md");
+            File.WriteAllText(outputPath, content + Environment.NewLine, new UTF8Encoding(false));
+            Console.WriteLine($"Generated ({requestedTarget}): {outputPath}");
+            generatedCount++;
+            continue;
+        }
+
+        notImplemented.Add(requestedTarget);
+    }
+
+    foreach (var pendingTarget in notImplemented)
+    {
+        Console.WriteLine($"WARNING: Export target '{pendingTarget}' is not implemented yet.");
+    }
+
+    if (generatedCount == 0)
+    {
+        Console.Error.WriteLine("No export files were generated.");
+        return 1;
+    }
+
+    if (notImplemented.Count > 0)
+    {
+        Console.WriteLine($"Export completed partially ({generatedCount} generated, {notImplemented.Count} pending).");
+    }
+
     return 0;
 }
 
@@ -532,5 +566,5 @@ static void PrintHelp()
     Console.WriteLine("Usage:");
     Console.WriteLine("  aicontext init [--path <directory>] [--name <project-name>] [--force]");
     Console.WriteLine("  aicontext validate [--path <directory>]");
-    Console.WriteLine("  aicontext export --target agents [--path <directory>]");
+    Console.WriteLine("  aicontext export --target <agents|all> [--path <directory>]");
 }
