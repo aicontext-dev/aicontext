@@ -38,20 +38,21 @@ Use the canonical schema URL in your `.aicontext/context.json`:
 Then validate locally:
 
 ```powershell
-.\scripts\validate-aicontext.ps1
+aicontext validate
 ```
 
 ## Validation
 
-Local validation command:
+Local validation command (from the repository, without installing the tool):
 
 ```powershell
-.\scripts\validate-aicontext.ps1
+dotnet run --project .\src\AIContext.CLI -- validate --strict
 ```
 
-CI workflow:
+CI workflows:
 
 - [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml)
+- [pr-checks.yml](./.github/workflows/pr-checks.yml)
 
 Test command:
 
@@ -98,8 +99,26 @@ Current commands:
 
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
 - `aicontext validate [--path <directory>] [--strict]`
-- `aicontext export --target <agents|copilot|claude|cursor|windsurf|aider> [--path <directory>] [--force] [--dry-run] [--check]`
-- `aicontext export --target all [--path <directory>] [--force] [--dry-run] [--check]` (generates targets from `exports.targets`; if not set, generates all supported targets)
+- `aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]`
+- `aicontext export --target all [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]` (generates targets from `exports.targets`; if not set, generates all supported targets except `devin`)
+
+### Rules and the split layout
+
+By default every export is one file that contains all context. For larger projects, put guidance that only matters for part of the code into `.aicontext/rules/*.md` and set `"exports": { "layout": "split" }` (or pass `--layout split`):
+
+```markdown
+---
+description: UI conventions for React components
+paths: ["src/ui/**", "**/*.tsx"]
+---
+
+Use the shared design-system components.
+```
+
+- `paths` set: the rule applies only when working with matching files. Only `description` set: the agent loads it when relevant. Neither: always on.
+- In the split layout `README.md` and `constraints.md` stay always on; scoped and on-demand content is exported as native rule files (Cursor `.mdc`, Copilot `.instructions.md`, Claude `.claude/rules`, Windsurf/Devin rules). Where a tool cannot scope content (AGENTS.md, Aider, and on-demand content in Copilot and Claude) it stays in the main file.
+- Generated rule files are named `aicontext-<name>` and are removed when their source disappears; your own rule files are never touched.
+- `devin` is opt-in (not part of the default `all` set) because Devin also loads `.windsurf/rules`.
 
 ## Website
 

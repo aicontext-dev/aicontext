@@ -11,9 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Validate .aicontext
-        shell: pwsh
-        run: ./scripts/validate-aicontext.ps1
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Validate .aicontext (schema, recommended files, secrets)
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- validate --strict
+
+      - name: Check generated exports are up to date
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- export --target all --check
 
   build-dotnet-projects:
     runs-on: ubuntu-latest
@@ -32,12 +38,6 @@ jobs:
           dotnet build src/AIContext/AIContext.csproj -c Release
           dotnet build src/AIContext.CLI/AIContext.CLI.csproj -c Release
           dotnet build src/AIContext.Spec/AIContext.Spec.csproj -c Release
-
-      - name: Validate .aicontext with the CLI (schema, recommended files, secrets)
-        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- validate
-
-      - name: Check generated exports are up to date
-        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- export --target all --check
 
   test-dotnet-projects:
     runs-on: ubuntu-latest

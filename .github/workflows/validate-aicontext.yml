@@ -5,15 +5,33 @@ on:
     paths:
       - '.aicontext/**'
       - 'schema/**'
-      - 'scripts/validate-aicontext.ps1'
       - 'SPEC.md'
+      - 'src/AIContext/**'
+      - 'src/AIContext.CLI/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'CONVENTIONS.md'
+      - '.github/copilot-instructions.md'
+      - '.cursor/**'
+      - '.windsurf/**'
+      - '.claude/**'
+      - '.github/instructions/**'
       - '.github/workflows/validate-aicontext.yml'
   pull_request:
     paths:
       - '.aicontext/**'
       - 'schema/**'
-      - 'scripts/validate-aicontext.ps1'
       - 'SPEC.md'
+      - 'src/AIContext/**'
+      - 'src/AIContext.CLI/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'CONVENTIONS.md'
+      - '.github/copilot-instructions.md'
+      - '.cursor/**'
+      - '.windsurf/**'
+      - '.claude/**'
+      - '.github/instructions/**'
       - '.github/workflows/validate-aicontext.yml'
   workflow_dispatch:
 
@@ -23,6 +41,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Validate .aicontext
-        shell: pwsh
-        run: ./scripts/validate-aicontext.ps1
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Validate .aicontext (schema, recommended files, secrets)
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- validate --strict
+
+      - name: Check generated exports are up to date
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- export --target all --check

@@ -184,6 +184,61 @@ public sealed class ContextValidatorTests : IDisposable
         Assert.DoesNotContain("hunter2", warning);
     }
 
+    [Fact]
+    public void ValidateDirectory_WithWindsurfAndDevinTargets_Warns()
+    {
+        WriteContext(new
+        {
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new { targets = new[] { "windsurf", "devin" }, layout = "split" }
+        });
+
+        var result = Validate();
+
+        Assert.Empty(result.Errors);
+        Assert.Contains(result.Warnings, w => w.Contains("both 'windsurf' and 'devin'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithUnknownLayout_ReturnsError()
+    {
+        WriteContext(new
+        {
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new { layout = "weird" }
+        });
+
+        Assert.Contains(Validate().Errors, e => e.StartsWith("context.json /exports/layout:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_ReportsRuleProblems()
+    {
+        WriteMinimalContext();
+        Directory.CreateDirectory(Path.Combine(_root, ".aicontext", "rules"));
+        File.WriteAllText(Path.Combine(_root, ".aicontext", "rules", "Bad Name.md"), "Body");
+        File.WriteAllText(Path.Combine(_root, ".aicontext", "rules", "ok.md"), "---\nowner: me\n---\nBody");
+
+        var result = Validate();
+
+        Assert.Contains(result.Errors, e => e.StartsWith("rules/Bad Name.md:", StringComparison.Ordinal));
+        Assert.Contains(result.Warnings, w => w.Contains("unknown frontmatter key 'owner'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_ScansRuleFilesForSecrets()
+    {
+        WriteMinimalContext();
+        Directory.CreateDirectory(Path.Combine(_root, ".aicontext", "rules"));
+        File.WriteAllText(Path.Combine(_root, ".aicontext", "rules", "ci.md"), "Use\npassword = hunter2\n");
+
+        Assert.Contains(Validate().Warnings, w => w.Contains(".aicontext/rules/ci.md:2", StringComparison.Ordinal));
+    }
+
     private ContextValidationResult Validate() => ContextValidator.ValidateDirectory(_root, CanonicalSchemaUrl);
 
     private void WriteMinimalContext()

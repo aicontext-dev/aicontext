@@ -65,6 +65,10 @@ public static class ContextValidator
             }
         }
 
+        var ruleLoad = RuleLoader.Load(contextDirectory);
+        errors.AddRange(ruleLoad.Errors);
+        warnings.AddRange(ruleLoad.Warnings);
+
         var extendedProfile = ValidateRecommendedFiles(contextDirectory, warnings) &&
                               errors.Count == 0 &&
                               contextValid;
@@ -103,9 +107,14 @@ public static class ContextValidator
             errors.Add("project.name must not be whitespace only.");
         }
 
-        if (!root.TryGetProperty("exports", out var exports) ||
-            exports.ValueKind != JsonValueKind.Object ||
-            !TryGetString(exports, "defaultTarget", out var defaultTarget) ||
+        if (!root.TryGetProperty("exports", out var exports) || exports.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        WarnWhenWindsurfAndDevinOverlap(exports, warnings);
+
+        if (!TryGetString(exports, "defaultTarget", out var defaultTarget) ||
             string.Equals(defaultTarget, "all", StringComparison.Ordinal))
         {
             return;
@@ -123,6 +132,28 @@ public static class ContextValidator
             {
                 errors.Add("exports.defaultTarget must be 'all' or one of exports.targets.");
             }
+        }
+    }
+
+    // Devin loads both .devin/rules and .windsurf/rules, so enabling both duplicates the context.
+    private static void WarnWhenWindsurfAndDevinOverlap(JsonElement exports, List<string> warnings)
+    {
+        if (!exports.TryGetProperty("targets", out var targetsElement) ||
+            targetsElement.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var targets = targetsElement.EnumerateArray()
+            .Where(x => x.ValueKind == JsonValueKind.String)
+            .Select(x => x.GetString())
+            .ToList();
+
+        if (targets.Contains("windsurf") && targets.Contains("devin"))
+        {
+            warnings.Add(
+                "exports.targets contains both 'windsurf' and 'devin'. Devin also loads .windsurf/rules, " +
+                "so the same rules would be loaded twice. Keep only one of them.");
         }
     }
 

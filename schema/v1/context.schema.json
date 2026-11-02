@@ -63,6 +63,7 @@
               "claude",
               "cursor",
               "windsurf",
+              "devin",
               "aider"
             ]
           }
@@ -75,8 +76,16 @@
             "claude",
             "cursor",
             "windsurf",
+            "devin",
             "aider",
             "all"
+          ]
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "single",
+            "split"
           ]
         }
       }

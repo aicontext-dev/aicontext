@@ -2,4 +2,4 @@ bin/
 obj/
 *.user
 .DS_Store
-Notes/
+notes/

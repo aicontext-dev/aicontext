@@ -6,9 +6,11 @@
     "description": "Open format standard for AI coding assistant project context.",
     "primaryLanguage": "C#",
     "stack": [
-      ".NET 10",
+      ".NET 9/10",
       "Markdown",
-      "JSON Schema"
+      "JSON Schema",
+      "JsonSchema.Net",
+      "xUnit"
     ]
   },
   "exports": {
@@ -17,11 +19,13 @@
       "copilot",
       "claude",
       "cursor",
-      "windsurf"
+      "windsurf",
+      "aider"
     ],
-    "defaultTarget": "all"
+    "defaultTarget": "all",
+    "layout": "split"
   },
   "metadata": {
-    "lastReviewed": "2026-11-01"
+    "lastReviewed": "2026-11-02"
   }
 }

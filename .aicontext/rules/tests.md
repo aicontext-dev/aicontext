@@ -1,0 +1,8 @@
+---
+description: Conventions for the xUnit test project
+paths: ["tests/**"]
+---
+- Name tests `Method_Condition_ExpectedResult`.
+- Tests that touch the file system use a unique temp directory per test class (`IDisposable`) and never read or write the repository checkout.
+- Every behavior change needs a test; tests must pass on both `net9.0` and `net10.0`.
+- Assert on stable parts of messages (location prefixes, file names), not on full third-party error texts.

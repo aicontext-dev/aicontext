@@ -7,4 +7,5 @@ public sealed record ExportContext(
     string? Decisions,
     string? Patterns,
     string? Constraints,
-    string? Glossary);
+    string? Glossary,
+    IReadOnlyList<RuleDocument>? Rules = null);
