@@ -54,6 +54,8 @@ public sealed class NestedAgentsTests : IDisposable
     [InlineData("**", "not a directory scope")]
     [InlineData("../outside/**", "not a directory scope")]
     [InlineData("/abs/**", "not a directory scope")]
+    [InlineData("C:/Windows/**", "not a directory scope")]
+    [InlineData("C:", "not a directory scope")]
     [InlineData("missing/**", "does not exist")]
     [InlineData("src/ui/button.tsx", "is a file")]
     public void Plan_KeepsEverythingElseInTheRootFile(string pattern, string expectedReason)

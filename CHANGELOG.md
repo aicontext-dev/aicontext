@@ -2,7 +2,7 @@
 
 All notable changes to the AIContext specification repository will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-11-02
 
 ### Added
 

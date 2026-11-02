@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>AIContext</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>aicontext.dev</Authors>
-    <Description>Open format standard for AI coding assistant project context. Specification and tooling coming soon.</Description>
+    <Description>Core library of the AIContext open format standard: schema validation, secret lint and deterministic multi-tool exports for AI coding assistant project context.</Description>
     <PackageTags>ai;context;copilot;cursor;claude;llm;developer-tools;standard</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/aicontext-dev/aicontext</PackageProjectUrl>

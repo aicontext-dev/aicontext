@@ -11,7 +11,7 @@
 `.aicontext/` is an open directory format for storing structured
 project knowledge that AI coding assistants can use.
 
-Works with: GitHub Copilot · Cursor · Claude Code · Windsurf · Aider
+Works with: GitHub Copilot · Cursor · Claude Code · Windsurf · Devin · Aider · any tool that reads `AGENTS.md`
 
 ## Specification
 
@@ -101,7 +101,6 @@ Current commands:
 - `aicontext validate [--path <directory>] [--strict]`
 - `aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]`
 - `aicontext export --target all [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]` (generates targets from `exports.targets`; if not set, generates all supported targets except `devin`)
-
 - `aicontext status [--path <directory>] [--layout <single|split>]`: shows, per target, how much context is always on versus scoped/on-demand (with estimated tokens), whether the exports are in sync, and suggests the `split` layout when it would reduce always-on context.
 
 ### Rules and the split layout

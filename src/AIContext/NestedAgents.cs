@@ -91,10 +91,19 @@ public static class NestedAgentsPlanner
         var segments = directory.Split('/');
         if (directory.Length == 0 ||
             directory.StartsWith('/') ||
+            directory.Contains(':', StringComparison.Ordinal) ||
             directory.IndexOfAny(GlobCharacters) >= 0 ||
             segments.Any(s => s.Length == 0 || s == "." || s == ".."))
         {
             reason = $"pattern '{pattern}' is not a directory scope (use '<directory>/**')";
+            return null;
+        }
+
+        // Defense in depth: the directory must resolve inside the repository.
+        var root = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!Path.GetFullPath(ExportTarget.ResolveRelative(basePath, directory)).StartsWith(root, StringComparison.Ordinal))
+        {
+            reason = $"pattern '{pattern}' points outside the repository";
             return null;
         }
 
