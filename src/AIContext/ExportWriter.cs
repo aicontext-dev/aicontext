@@ -25,9 +25,10 @@ public static class ExportWriter
         string basePath,
         ExportContext exportContext,
         ExportLayout layout,
-        bool force)
+        bool force,
+        RenderOptions? options = null)
     {
-        var outputs = target.Render(exportContext, layout);
+        var outputs = target.Render(exportContext, layout, options);
         var plans = new List<ExportFilePlan>();
         var produced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -39,6 +40,7 @@ public static class ExportWriter
         }
 
         plans.AddRange(PlanOrphans(target, basePath, produced));
+        plans.AddRange(PlanNestedOrphans(target, basePath, produced));
         return plans;
     }
 
@@ -85,6 +87,74 @@ public static class ExportWriter
 
         var status = force || IsGenerated(existing) ? ExportFileStatus.Updated : ExportFileStatus.Conflict;
         return new ExportFilePlan(targetName, path, content, status);
+    }
+
+    // Nested files (for example src/ui/AGENTS.md) can be anywhere in the repository, so the tree is walked,
+    // skipping hidden and dependency/build directories. Only files with the generated header are removed.
+    private static IEnumerable<ExportFilePlan> PlanNestedOrphans(ExportTarget target, string basePath, HashSet<string> produced)
+    {
+        if (target.NestedFileName is null)
+        {
+            yield break;
+        }
+
+        foreach (var file in FindFilesByName(basePath, target.NestedFileName, 0))
+        {
+            if (!produced.Contains(System.IO.Path.GetFullPath(file)) && IsGenerated(File.ReadAllText(file)))
+            {
+                yield return new ExportFilePlan(target.Name, file, string.Empty, ExportFileStatus.Deleted);
+            }
+        }
+    }
+
+    private static readonly HashSet<string> SkippedDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "node_modules", "bin", "obj", "vendor", "dist", "build", "target", "venv", "__pycache__"
+    };
+
+    private const int MaxWalkDepth = 12;
+
+    private static IEnumerable<string> FindFilesByName(string directory, string fileName, int depth)
+    {
+        if (depth > 0)
+        {
+            var candidate = System.IO.Path.Combine(directory, fileName);
+            if (File.Exists(candidate))
+            {
+                yield return candidate;
+            }
+        }
+
+        if (depth >= MaxWalkDepth)
+        {
+            yield break;
+        }
+
+        IEnumerable<string> children;
+        try
+        {
+            children = Directory.EnumerateDirectories(directory).OrderBy(d => d, StringComparer.Ordinal).ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            yield break;
+        }
+
+        foreach (var child in children)
+        {
+            var name = System.IO.Path.GetFileName(child);
+            if (name.StartsWith('.') ||
+                SkippedDirectories.Contains(name) ||
+                new DirectoryInfo(child).Attributes.HasFlag(FileAttributes.ReparsePoint))
+            {
+                continue;
+            }
+
+            foreach (var file in FindFilesByName(child, fileName, depth + 1))
+            {
+                yield return file;
+            }
+        }
     }
 
     // Only files that carry the generated header and the aicontext- prefix are ever removed.

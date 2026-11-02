@@ -14,6 +14,9 @@ public enum RuleStyle
 
 public sealed record ExportOutput(string RelativePath, string Content);
 
+// Extra, optional rendering inputs. BasePath is needed to check which directories exist.
+public sealed record RenderOptions(string? BasePath, bool NestedAgents);
+
 public sealed record ExportTarget(
     string Name,
     string RelativePath,
@@ -21,7 +24,9 @@ public sealed record ExportTarget(
     string? RuleDirectory,
     string RuleExtension,
     bool InDefaultSet = true,
-    bool AlwaysOnTriggerInSingleLayout = false)
+    bool AlwaysOnTriggerInSingleLayout = false,
+    // File name used for nested per-directory files (AGENTS.md only).
+    string? NestedFileName = null)
 {
     public string ResolvePath(string basePath) => ResolveRelative(basePath, RelativePath);
 
@@ -32,8 +37,8 @@ public sealed record ExportTarget(
         return Path.Combine(segments.ToArray());
     }
 
-    public IReadOnlyList<ExportOutput> Render(ExportContext exportContext, ExportLayout layout) =>
-        ContextExporter.Render(this, exportContext, layout);
+    public IReadOnlyList<ExportOutput> Render(ExportContext exportContext, ExportLayout layout, RenderOptions? options = null) =>
+        ContextExporter.Render(this, exportContext, layout, options);
 
     // The main file of the single layout.
     public string Build(ExportContext exportContext) =>
@@ -46,7 +51,7 @@ public static class ExportTargets
 
     public static IReadOnlyList<ExportTarget> All { get; } =
     [
-        new("agents", "AGENTS.md", RuleStyle.None, null, ".md"),
+        new("agents", "AGENTS.md", RuleStyle.None, null, ".md", NestedFileName: "AGENTS.md"),
         new("copilot", ".github/copilot-instructions.md", RuleStyle.Copilot, ".github/instructions", ".instructions.md"),
         new("claude", "CLAUDE.md", RuleStyle.Claude, ".claude/rules", ".md"),
         new("cursor", ".cursor/rules/project.mdc", RuleStyle.Cursor, ".cursor/rules", ".mdc"),

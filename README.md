@@ -121,6 +121,7 @@ Use the shared design-system components.
 - In the split layout `README.md` and `constraints.md` stay always on; scoped and on-demand content is exported as native rule files (Cursor `.mdc`, Copilot `.instructions.md`, Claude `.claude/rules`, Windsurf/Devin rules). Where a tool cannot scope content (AGENTS.md, Aider, and on-demand content in Copilot and Claude) it stays in the main file.
 - Generated rule files are named `aicontext-<name>` and are removed when their source disappears; your own rule files are never touched.
 - `devin` is opt-in (not part of the default `all` set) because Devin also loads `.windsurf/rules`.
+- `exports.nestedAgents: true` (split layout only) writes rules scoped to an exact directory (`services/billing/**`) to `services/billing/AGENTS.md` instead of the root `AGENTS.md`, so tools that only read `AGENTS.md` (Codex, Jules, Junie, ...) load them only when working there. Rules with other patterns (`**/*.ts`, `src/ui/**/*.tsx`) or non-existent directories stay in the root file; `aicontext status` shows which and why. Note that Copilot, Cursor and Devin also read `AGENTS.md`, so combining this with their native rule targets can load a rule twice.
 
 ## Website
 

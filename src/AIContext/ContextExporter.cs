@@ -31,15 +31,30 @@ public static class ContextExporter
     public static string BuildCursor(ExportContext exportContext) => Single("cursor", exportContext);
 
     // Renders every file a target produces. The first output is always the target's main file.
-    public static IReadOnlyList<ExportOutput> Render(ExportTarget target, ExportContext exportContext, ExportLayout layout)
+    public static IReadOnlyList<ExportOutput> Render(
+        ExportTarget target,
+        ExportContext exportContext,
+        ExportLayout layout,
+        RenderOptions? options = null)
     {
         var split = layout == ExportLayout.Split && target.Style != RuleStyle.None && target.RuleDirectory is not null;
         var hash = ComputeSourceHash(exportContext);
+
+        var nested = layout == ExportLayout.Split &&
+                     target.NestedFileName is not null &&
+                     options is { NestedAgents: true, BasePath: not null }
+            ? NestedAgentsPlanner.Plan(exportContext.Rules ?? [], options.BasePath)
+            : null;
 
         var mainItems = new List<Item>();
         var fileItems = new List<Item>();
         foreach (var item in BuildItems(exportContext))
         {
+            if (nested is not null && item.IsRule && nested.NestedRuleNames.Contains(item.Id))
+            {
+                continue;
+            }
+
             var separate = split &&
                            (item.Kind == RuleKind.Scoped ||
                             (item.Kind == RuleKind.OnDemand && SupportsOnDemand(target.Style)));
@@ -57,7 +72,31 @@ public static class ContextExporter
             outputs.Add(new ExportOutput(path, BuildRuleFile(target, hash, item)));
         }
 
+        if (nested is not null)
+        {
+            foreach (var (directory, rules) in nested.ByDirectory)
+            {
+                outputs.Add(new ExportOutput($"{directory}/{target.NestedFileName}", BuildNestedFile(target, hash, directory, rules)));
+            }
+        }
+
         return outputs;
+    }
+
+    private static string BuildNestedFile(ExportTarget target, string hash, string directory, IReadOnlyList<RuleDocument> rules)
+    {
+        var builder = new StringBuilder();
+        AppendHeader(builder, target.Name, hash);
+        AppendLine(builder, $"# Rules for {directory}");
+
+        foreach (var rule in rules.OrderBy(r => r.Name, StringComparer.Ordinal))
+        {
+            AppendLine(builder, string.Empty);
+            AppendLine(builder, $"## Rule: {rule.Name}");
+            AppendLine(builder, Clean(rule.Body));
+        }
+
+        return builder.ToString().TrimEnd() + "\n";
     }
 
     // Hash of the normalized sources, so output is identical across OSes and line-ending settings.

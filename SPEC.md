@@ -206,6 +206,12 @@ In the split layout, always-on content (`README.md`, `constraints.md`, always-on
 
 Content is never dropped: where a tool cannot express a scope, the content is kept in the main file, with the scope stated in text (for example `Applies to: src/ui/**`).
 
+#### Nested `AGENTS.md` (optional)
+
+`AGENTS.md` has no scoping of its own, but tools that read it also read an `AGENTS.md` located in a subdirectory when working there. With `exports.nestedAgents: true` and the split layout, an implementation MAY write directory-scoped rules to `<directory>/AGENTS.md` instead of the root file. This applies only to rules whose every pattern is an exact directory scope (`<dir>/**`, `<dir>/**/*`, `<dir>/` or `<dir>`) and whose directories exist; all other rules stay in the root file. Implementations MUST NOT create directories for this purpose and SHOULD report which rules were kept in the root file and why. Orphaned generated nested files MAY be removed using the same header rule as other generated files.
+
+Because several tools read both `AGENTS.md` and their own rule files, enabling `nestedAgents` together with other scoping targets (for example `cursor` or `copilot`) can make a tool see the same rule twice.
+
 Generated rule files MUST be named with the `aicontext-` prefix, so they never collide with hand-written rule files, and MUST carry the generated-file header. When a generated rule file no longer corresponds to a source, implementations SHOULD remove it, and MUST NOT remove files that lack the prefix or the header.
 
 ## 7. Validation levels

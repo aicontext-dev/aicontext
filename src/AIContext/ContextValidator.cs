@@ -114,6 +114,13 @@ public static class ContextValidator
 
         WarnWhenWindsurfAndDevinOverlap(exports, warnings);
 
+        if (exports.TryGetProperty("nestedAgents", out var nestedAgents) &&
+            nestedAgents.ValueKind == JsonValueKind.True &&
+            !(exports.TryGetProperty("layout", out var layout) && layout.ValueKind == JsonValueKind.String && layout.GetString() == "split"))
+        {
+            warnings.Add("exports.nestedAgents has no effect unless exports.layout is 'split'.");
+        }
+
         if (!TryGetString(exports, "defaultTarget", out var defaultTarget) ||
             string.Equals(defaultTarget, "all", StringComparison.Ordinal))
         {

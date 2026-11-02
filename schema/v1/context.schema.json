@@ -87,6 +87,9 @@
             "single",
             "split"
           ]
+        },
+        "nestedAgents": {
+          "type": "boolean"
         }
       }
     },

@@ -12,6 +12,14 @@ public enum ExportLayout
 
 public static class ExportLayoutResolver
 {
+    // exports.nestedAgents: also write per-directory AGENTS.md for directory-scoped rules (split layout only).
+    public static bool ResolveNestedAgents(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.TryGetProperty("exports", out var exports) &&
+        exports.ValueKind == JsonValueKind.Object &&
+        exports.TryGetProperty("nestedAgents", out var nested) &&
+        nested.ValueKind == JsonValueKind.True;
+
     public static bool TryParse(string? value, out ExportLayout layout)
     {
         switch (value)

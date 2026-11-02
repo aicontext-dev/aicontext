@@ -239,6 +239,51 @@ public sealed class ContextValidatorTests : IDisposable
         Assert.Contains(Validate().Warnings, w => w.Contains(".aicontext/rules/ci.md:2", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ValidateDirectory_WithNestedAgentsWithoutSplit_Warns()
+    {
+        WriteContext(new
+        {
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new { nestedAgents = true }
+        });
+
+        var result = Validate();
+
+        Assert.Empty(result.Errors);
+        Assert.Contains(result.Warnings, w => w.Contains("nestedAgents has no effect", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithNestedAgentsAndSplit_DoesNotWarn()
+    {
+        WriteContext(new
+        {
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new { layout = "split", nestedAgents = true }
+        });
+
+        Assert.DoesNotContain(Validate().Warnings, w => w.Contains("nestedAgents", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithNonBooleanNestedAgents_ReturnsError()
+    {
+        WriteContext(new
+        {
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new { nestedAgents = "yes" }
+        });
+
+        Assert.Contains(Validate().Errors, e => e.StartsWith("context.json /exports/nestedAgents:", StringComparison.Ordinal));
+    }
+
     private ContextValidationResult Validate() => ContextValidator.ValidateDirectory(_root, CanonicalSchemaUrl);
 
     private void WriteMinimalContext()

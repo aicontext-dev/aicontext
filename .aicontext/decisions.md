@@ -38,3 +38,8 @@ Format: context, decision, consequence. Newest decisions last.
 **Context:** Devin loads both `.devin/rules` and `.windsurf/rules`.
 **Decision:** `devin` is a supported target but is excluded from the default `all` set, and `validate` warns when `windsurf` and `devin` are both enabled.
 **Consequence:** Rules are not loaded twice by default.
+
+### D10. Nested AGENTS.md is opt-in and exact-directory only
+**Context:** AGENTS.md has no scoping, yet many tools read only AGENTS.md and read nested ones when working in a subdirectory.
+**Decision:** With `exports.nestedAgents: true` (split layout), rules scoped to an exact existing directory are written to `<directory>/AGENTS.md`. Patterns that are broader or narrower than a directory (`**/*.ts`, `src/ui/**/*.tsx`) stay in the root file, and directories are never created.
+**Consequence:** A nested file never applies to more or fewer files than the author intended. Combining it with native rule targets of tools that also read AGENTS.md can load a rule twice, so it is off by default and not enabled in this repository.

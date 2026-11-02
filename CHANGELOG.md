@@ -6,6 +6,8 @@ All notable changes to the AIContext specification repository will be documented
 
 ### Added
 
+- `exports.nestedAgents` (split layout): rules scoped to an exact directory are exported to nested `<directory>/AGENTS.md` files so tools that only read `AGENTS.md` load them on demand. Only exact directory scopes of existing directories are mapped; everything else stays in the root file. `status` lists nested files and why a rule was kept in the root file. Orphaned generated nested files are removed (the tree walk skips hidden, `node_modules`, `bin`, `obj`, `vendor`, `dist`, `build`, `target`, `venv` directories). See SPEC 6.4.
+
 - **Rules and split export layout.** Optional `.aicontext/rules/*.md` with `description` and `paths` frontmatter, and `exports.layout: "single" | "split"` (also `aicontext export --layout`). In the split layout `README.md` and `constraints.md` stay in a small always-on file, while scoped and on-demand content is exported as native rule files: Cursor `.mdc` (`globs`, `description`), Copilot `.github/instructions/*.instructions.md` (`applyTo`), Claude `.claude/rules/*.md` (`paths`), Windsurf/Devin rules (`trigger`, `globs`, `description`). Where a tool cannot scope content (AGENTS.md, Aider; on-demand content in Copilot and Claude) it stays in the main file. See SPEC 4.4 and 6.4.
 - `aicontext status` command: context size per tool (always on vs. scoped/on-demand, estimated tokens), export sync state, and a hint when the `split` layout would reduce always-on context.
 - `ContextLoader` and `ExportStatus` in the core library (shared by `export` and `status`).

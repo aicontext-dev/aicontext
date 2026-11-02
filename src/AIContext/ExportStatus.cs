@@ -29,7 +29,8 @@ public static class ExportStatus
     public static IReadOnlyList<TargetStatus> Compute(
         LoadedContext loaded,
         IReadOnlyList<string> targets,
-        ExportLayout layout)
+        ExportLayout layout,
+        RenderOptions? options = null)
     {
         var otherLayout = layout == ExportLayout.Split ? ExportLayout.Single : ExportLayout.Split;
         var result = new List<TargetStatus>();
@@ -37,12 +38,12 @@ public static class ExportStatus
         foreach (var name in targets)
         {
             var target = ExportTargets.Find(name)!;
-            var outputs = target.Render(loaded.Context, layout);
-            var plans = ExportWriter.PlanTarget(target, loaded.BasePath, loaded.Context, layout, force: false);
+            var outputs = target.Render(loaded.Context, layout, options);
+            var plans = ExportWriter.PlanTarget(target, loaded.BasePath, loaded.Context, layout, force: false, options);
 
             var alwaysOn = outputs[0].Content.Length;
             var onDemand = outputs.Skip(1).Sum(o => o.Content.Length);
-            var otherAlwaysOn = target.Render(loaded.Context, otherLayout)[0].Content.Length;
+            var otherAlwaysOn = target.Render(loaded.Context, otherLayout, options)[0].Content.Length;
 
             result.Add(new TargetStatus(name, outputs.Count, alwaysOn, onDemand, DetermineState(plans), otherAlwaysOn));
         }
