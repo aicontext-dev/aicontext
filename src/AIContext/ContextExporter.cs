@@ -200,7 +200,8 @@ public static class ContextExporter
 
                 if (scoped)
                 {
-                    AppendLine(builder, $"globs: {Quote(globs)}");
+                    // Cursor documents unquoted, comma-separated globs.
+                    AppendLine(builder, $"globs: {globs}");
                 }
 
                 AppendLine(builder, "alwaysApply: false");

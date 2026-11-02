@@ -1,6 +1,6 @@
 ---
 description: "Conventions for the xUnit test project"
-globs: "tests/**"
+globs: tests/**
 alwaysApply: false
 ---
 

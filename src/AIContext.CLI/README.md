@@ -19,6 +19,7 @@ Available commands:
 - `aicontext init [--path <directory>] [--name <project-name>] [--force]`
 - `aicontext validate [--path <directory>] [--strict]`
 - `aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider|all> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]`
+- `aicontext status [--path <directory>] [--layout <single|split>]` (context size per tool and export sync state)
 
 With `--layout split` (or `exports.layout: "split"`), scoped and on-demand content from `.aicontext/rules/*.md` and the optional sections is written as native per-tool rule files instead of one large file. `devin` is opt-in and not part of the default `all` set.
 

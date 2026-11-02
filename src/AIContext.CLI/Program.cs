@@ -28,6 +28,7 @@ return command switch
     "init" => RunInit(options.Values),
     "validate" => RunValidate(options.Values),
     "export" => RunExport(options.Values),
+    "status" => RunStatus(options.Values),
     _ => UnknownCommand(command)
 };
 
@@ -152,77 +153,34 @@ int RunExport(Dictionary<string, string?> options)
         return 1;
     }
 
-    var contextDirectory = Path.Combine(basePath, ".aicontext");
-    var readmePath = Path.Combine(contextDirectory, "README.md");
-    var contextPath = Path.Combine(contextDirectory, "context.json");
-
-    if (!File.Exists(readmePath))
+    var load = ContextLoader.Load(basePath);
+    if (load.Loaded is null)
     {
-        Console.Error.WriteLine($"Missing required file: {readmePath}");
-        return 1;
-    }
-
-    if (!File.Exists(contextPath))
-    {
-        Console.Error.WriteLine($"Missing required file: {contextPath}");
-        return 1;
-    }
-
-    JsonElement root;
-    try
-    {
-        using var document = JsonDocument.Parse(File.ReadAllText(contextPath));
-        root = document.RootElement.Clone();
-    }
-    catch (JsonException ex)
-    {
-        Console.Error.WriteLine($"Invalid JSON in {contextPath}. {ex.Message}");
-        return 1;
-    }
-
-    List<string> requestedTargets;
-    if (string.Equals(target, "all", StringComparison.Ordinal))
-    {
-        var targetResolution = ExportTargetResolver.ResolveTargetsForAll(root, ExportTargets.DefaultNames, allowedTargets);
-        if (targetResolution.Error is not null)
+        foreach (var loadError in load.Errors)
         {
-            Console.Error.WriteLine($"Invalid exports.targets configuration in {contextPath}: {targetResolution.Error}");
-            Console.Error.WriteLine("Run 'aicontext validate' to see full details.");
-            return 1;
+            Console.Error.WriteLine(loadError.StartsWith("rules/", StringComparison.Ordinal) ? $"ERROR: {loadError}" : loadError);
         }
 
-        requestedTargets = targetResolution.Targets;
-    }
-    else
-    {
-        requestedTargets = new List<string> { target };
-    }
-
-    if (!root.TryGetProperty("project", out var project) ||
-        !TryGetString(project, "name", out var projectName) ||
-        string.IsNullOrWhiteSpace(projectName))
-    {
-        projectName = new DirectoryInfo(basePath).Name;
-    }
-
-    var readme = File.ReadAllText(readmePath);
-    var architecture = ReadOptionalContextSection(contextDirectory, "architecture.md");
-    var decisions = ReadOptionalContextSection(contextDirectory, "decisions.md");
-    var patterns = ReadOptionalContextSection(contextDirectory, "patterns.md");
-    var constraints = ReadOptionalContextSection(contextDirectory, "constraints.md");
-    var glossary = ReadOptionalContextSection(contextDirectory, "glossary.md");
-
-    var ruleLoad = RuleLoader.Load(contextDirectory);
-    if (ruleLoad.Errors.Count > 0)
-    {
-        foreach (var ruleError in ruleLoad.Errors)
+        if (load.Errors.Any(e => e.StartsWith("rules/", StringComparison.Ordinal)))
         {
-            Console.Error.WriteLine($"ERROR: {ruleError}");
+            Console.Error.WriteLine("Fix the rule files above (run 'aicontext validate' for details). No files were written.");
         }
 
-        Console.Error.WriteLine("Fix the rule files above (run 'aicontext validate' for details). No files were written.");
         return 1;
     }
+
+    var root = load.Loaded.Root;
+    var exportContext = load.Loaded.Context;
+
+    var targetResolution = ResolveTargets(root, target, out var targetError);
+    if (targetResolution is null)
+    {
+        Console.Error.WriteLine(targetError);
+        Console.Error.WriteLine("Run 'aicontext validate' to see full details.");
+        return 1;
+    }
+
+    var requestedTargets = targetResolution;
 
     var layoutResolution = ExportLayoutResolver.Resolve(root, GetOption(options, "layout"));
     if (layoutResolution.Error is not null)
@@ -230,16 +188,6 @@ int RunExport(Dictionary<string, string?> options)
         Console.Error.WriteLine(layoutResolution.Error);
         return 1;
     }
-
-    var exportContext = new AIContext.ExportContext(
-        projectName,
-        readme,
-        architecture,
-        decisions,
-        patterns,
-        constraints,
-        glossary,
-        ruleLoad.Rules);
 
     var force = IsTrue(options, "force");
     var check = IsTrue(options, "check");
@@ -306,17 +254,118 @@ static string DescribeStatus(ExportFileStatus status, bool preview) => status sw
     _ => "Conflict"
 };
 
-static bool TryGetString(JsonElement element, string propertyName, out string value)
+List<string>? ResolveTargets(JsonElement root, string target, out string? error)
 {
-    if (element.TryGetProperty(propertyName, out var propertyValue) && propertyValue.ValueKind == JsonValueKind.String)
+    error = null;
+    if (!string.Equals(target, "all", StringComparison.Ordinal))
     {
-        value = propertyValue.GetString() ?? string.Empty;
-        return true;
+        return new List<string> { target };
     }
 
-    value = string.Empty;
-    return false;
+    var resolution = ExportTargetResolver.ResolveTargetsForAll(root, ExportTargets.DefaultNames, allowedTargets);
+    if (resolution.Error is not null)
+    {
+        error = $"Invalid exports.targets configuration in .aicontext/context.json: {resolution.Error}";
+        return null;
+    }
+
+    return resolution.Targets;
 }
+
+int RunStatus(Dictionary<string, string?> options)
+{
+    var basePath = GetBasePath(options);
+    var load = ContextLoader.Load(basePath);
+    if (load.Loaded is null)
+    {
+        foreach (var loadError in load.Errors)
+        {
+            Console.Error.WriteLine($"ERROR: {loadError}");
+        }
+
+        return 1;
+    }
+
+    var targets = ResolveTargets(load.Loaded.Root, "all", out var targetError);
+    if (targets is null)
+    {
+        Console.Error.WriteLine(targetError);
+        return 1;
+    }
+
+    var layoutResolution = ExportLayoutResolver.Resolve(load.Loaded.Root, GetOption(options, "layout"));
+    if (layoutResolution.Error is not null)
+    {
+        Console.Error.WriteLine(layoutResolution.Error);
+        return 1;
+    }
+
+    var layout = layoutResolution.Layout;
+    var statuses = ExportStatus.Compute(load.Loaded, targets, layout);
+
+    Console.WriteLine($"Project: {load.Loaded.Context.ProjectName}");
+    Console.WriteLine($"Layout:  {layout.ToString().ToLowerInvariant()}");
+
+    var rules = load.Loaded.Context.Rules ?? [];
+    if (rules.Count > 0)
+    {
+        Console.WriteLine($"Rules:   {rules.Count}");
+        foreach (var rule in rules)
+        {
+            var scope = rule.Kind switch
+            {
+                RuleKind.Scoped => $"scoped    {string.Join(", ", rule.Paths)}",
+                RuleKind.OnDemand => $"on-demand {rule.Description}",
+                _ => "always on"
+            };
+            Console.WriteLine($"  {rule.Name,-16} {scope}");
+        }
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"{"Target",-10}{"Always on",-22}{"Scoped / on-demand",-22}{"Files",-7}State");
+    foreach (var status in statuses)
+    {
+        var onDemand = status.OnDemandChars == 0 ? "-" : FormatSize(status.OnDemandChars);
+        Console.WriteLine(
+            $"{status.Target,-10}{FormatSize(status.AlwaysOnChars),-22}{onDemand,-22}{status.FileCount,-7}{DescribeState(status.State)}");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("Always on = loaded in every request. Scoped / on-demand = loaded only for matching files or when relevant.");
+    Console.WriteLine($"Token counts are estimates (~{ExportStatus.CharsPerToken} characters per token).");
+
+    if (layout == ExportLayout.Single)
+    {
+        var savings = statuses
+            .Where(s => s.AlwaysOnCharsInOtherLayout < s.AlwaysOnChars)
+            .Select(s => $"{s.Target} {FormatSize(s.AlwaysOnChars)} -> {FormatSize(s.AlwaysOnCharsInOtherLayout)}")
+            .ToList();
+
+        if (savings.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Tip: the 'split' layout (exports.layout) would reduce always-on context:");
+            foreach (var saving in savings)
+            {
+                Console.WriteLine($"  {saving}");
+            }
+        }
+    }
+
+    return 0;
+}
+
+static string FormatSize(int chars) =>
+    $"{(chars / 1024.0).ToString("0.0", CultureInfo.InvariantCulture),4} KB (~{ExportStatus.EstimateTokens(chars).ToString("N0", CultureInfo.InvariantCulture)} tok)";
+
+static string DescribeState(SyncState state) => state switch
+{
+    SyncState.InSync => "in sync",
+    SyncState.OutOfDate => "out of date (run export)",
+    SyncState.NotExported => "not exported",
+    _ => "conflict (existing file not generated by aicontext)"
+};
 
 static string GetBasePath(Dictionary<string, string?> options)
 {
@@ -348,18 +397,6 @@ static bool IsTrue(Dictionary<string, string?> options, string key)
 static string? GetOption(Dictionary<string, string?> options, string key)
 {
     return options.TryGetValue(key, out var value) ? value : null;
-}
-
-static string? ReadOptionalContextSection(string contextDirectory, string fileName)
-{
-    var filePath = Path.Combine(contextDirectory, fileName);
-    if (!File.Exists(filePath))
-    {
-        return null;
-    }
-
-    var content = File.ReadAllText(filePath).Trim();
-    return string.IsNullOrWhiteSpace(content) ? null : content;
 }
 
 static (Dictionary<string, string?> Values, string? Error) ParseOptions(string[] args)
@@ -404,6 +441,10 @@ static void PrintHelp()
     Console.WriteLine("  aicontext init [--path <directory>] [--name <project-name>] [--force]");
     Console.WriteLine("  aicontext validate [--path <directory>] [--strict]");
     Console.WriteLine("  aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider|all> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]");
+    Console.WriteLine("  aicontext status [--path <directory>] [--layout <single|split>]");
+    Console.WriteLine();
+    Console.WriteLine("Status:");
+    Console.WriteLine("  Shows how much context each tool loads (always on vs. scoped/on-demand) and whether exports are in sync.");
     Console.WriteLine();
     Console.WriteLine("Validate options:");
     Console.WriteLine("  --strict    Treat warnings (missing recommended files, possible secrets) as errors.");

@@ -299,4 +299,6 @@ Planned command surface:
 - `aicontext status`
 - `aicontext diff`
 
+`status` reports, per export target, how much content is always loaded versus loaded only by scope or relevance, and whether generated files are in sync with `.aicontext/`.
+
 This section is informative only; command behavior is defined by tooling implementation, not by the file format itself.

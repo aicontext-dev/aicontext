@@ -7,6 +7,8 @@ All notable changes to the AIContext specification repository will be documented
 ### Added
 
 - **Rules and split export layout.** Optional `.aicontext/rules/*.md` with `description` and `paths` frontmatter, and `exports.layout: "single" | "split"` (also `aicontext export --layout`). In the split layout `README.md` and `constraints.md` stay in a small always-on file, while scoped and on-demand content is exported as native rule files: Cursor `.mdc` (`globs`, `description`), Copilot `.github/instructions/*.instructions.md` (`applyTo`), Claude `.claude/rules/*.md` (`paths`), Windsurf/Devin rules (`trigger`, `globs`, `description`). Where a tool cannot scope content (AGENTS.md, Aider; on-demand content in Copilot and Claude) it stays in the main file. See SPEC 4.4 and 6.4.
+- `aicontext status` command: context size per tool (always on vs. scoped/on-demand, estimated tokens), export sync state, and a hint when the `split` layout would reduce always-on context.
+- `ContextLoader` and `ExportStatus` in the core library (shared by `export` and `status`).
 - `devin` export target (`.devin/rules/`). It is opt-in: excluded from the default `all` set, and `validate` warns when `windsurf` and `devin` are both enabled (Devin also loads `.windsurf/rules`).
 - Generated rule files use the `aicontext-` prefix; `export` removes generated rule files whose source no longer exists and never touches other files.
 - `validate` checks rule files (name, frontmatter, paths) and scans them for secrets.

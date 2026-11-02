@@ -61,7 +61,7 @@ public sealed class SplitExportTests : IDisposable
         Assert.DoesNotContain("Use shared components.", main);
 
         var ui = Content(outputs, ".cursor/rules/aicontext-ui.mdc");
-        Assert.Contains("globs: \"src/ui/**,**/*.tsx\"", ui);
+        Assert.Contains("globs: src/ui/**,**/*.tsx", ui);
         Assert.Contains("description: \"UI conventions\"", ui);
         Assert.Contains("alwaysApply: false", ui);
 
