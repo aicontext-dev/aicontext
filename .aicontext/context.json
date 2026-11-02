@@ -6,7 +6,7 @@
     "description": "Open format standard for AI coding assistant project context.",
     "primaryLanguage": "C#",
     "stack": [
-      ".NET 9",
+      ".NET 10",
       "Markdown",
       "JSON Schema"
     ]

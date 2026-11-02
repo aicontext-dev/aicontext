@@ -2,6 +2,15 @@
 
 All notable changes to the AIContext specification repository will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- All projects now multi-target `net9.0;net10.0`; the `aicontext` .NET tool package ships both, so it installs on either runtime.
+- Test project runs on both `net9.0` and `net10.0`.
+- CI and publish workflows install .NET 9 and .NET 10 SDKs.
+- Repository `.aicontext` stack updated to `.NET 10` and generated exports refreshed.
+
 ## [0.2.0] - 2026-11-01
 
 ### Changed

@@ -15,7 +15,9 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: |
+            9.0.x
+            10.0.x
 
       - name: NuGet login (Trusted Publishing)
         uses: NuGet/login@v1
