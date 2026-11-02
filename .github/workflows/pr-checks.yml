@@ -33,6 +33,12 @@ jobs:
           dotnet build src/AIContext.CLI/AIContext.CLI.csproj -c Release
           dotnet build src/AIContext.Spec/AIContext.Spec.csproj -c Release
 
+      - name: Validate .aicontext with the CLI (schema, recommended files, secrets)
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- validate
+
+      - name: Check generated exports are up to date
+        run: dotnet run --project src/AIContext.CLI/AIContext.CLI.csproj -c Release -f net10.0 -- export --target all --check
+
   test-dotnet-projects:
     runs-on: ubuntu-latest
     needs: build-dotnet-projects

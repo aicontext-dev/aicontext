@@ -4,168 +4,203 @@ using Xunit;
 
 namespace AIContext.Tests;
 
-public class ContextValidatorTests
+public sealed class ContextValidatorTests : IDisposable
 {
-    private static readonly HashSet<string> AllowedTargets = new(StringComparer.Ordinal)
-    {
-        "agents",
-        "copilot",
-        "claude",
-        "cursor",
-        "windsurf",
-        "aider"
-    };
-
     private const string CanonicalSchemaUrl = "https://aicontext.dev/schema/v1/context.schema.json";
     private const string ExpectedSpecVersion = "0.1.0";
 
-    [Fact]
-    public void ValidateDirectory_WithValidContext_ReturnsNoErrors()
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"aicontext-tests-{Guid.NewGuid():N}");
+
+    public ContextValidatorTests()
     {
-        var root = CreateTempDirectory();
-        try
-        {
-            WriteContextFiles(root, new
-            {
-                @schema = CanonicalSchemaUrl,
-                specVersion = ExpectedSpecVersion,
-                project = new { name = "sample" },
-                exports = new
-                {
-                    targets = new[] { "agents", "copilot" },
-                    defaultTarget = "agents"
-                },
-                metadata = new
-                {
-                    lastReviewed = "2026-11-01"
-                }
-            });
-            WriteSchemaFile(root);
+        Directory.CreateDirectory(Path.Combine(_root, ".aicontext"));
+    }
 
-            var result = ContextValidator.ValidateDirectory(root, CanonicalSchemaUrl, ExpectedSpecVersion, AllowedTargets);
-
-            Assert.Empty(result.Errors);
-            Assert.Empty(result.Warnings);
-            Assert.NotNull(result.LocalSchemaPath);
-        }
-        finally
-        {
-            Directory.Delete(root, true);
-        }
+    public void Dispose()
+    {
+        Directory.Delete(_root, true);
     }
 
     [Fact]
-    public void ValidateDirectory_WithoutSchemaFile_ReturnsSchemaWarning()
+    public void ValidateDirectory_WithValidContext_ReturnsNoErrors_AndWarnsAboutRecommendedFiles()
     {
-        var root = CreateTempDirectory();
-        try
+        WriteContext(new
         {
-            WriteContextFiles(root, new
-            {
-                @schema = CanonicalSchemaUrl,
-                specVersion = ExpectedSpecVersion,
-                project = new { name = "sample" }
-            });
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample", description = "Demo", stack = new[] { ".NET 10" } },
+            exports = new { targets = new[] { "agents", "copilot" }, defaultTarget = "agents" },
+            metadata = new { lastReviewed = "2026-11-01" }
+        });
 
-            var result = ContextValidator.ValidateDirectory(root, CanonicalSchemaUrl, ExpectedSpecVersion, AllowedTargets);
+        var result = Validate();
 
-            Assert.Empty(result.Errors);
-            Assert.Contains(
-                "Local schema file not found at schema/v1/context.schema.json in current directory or parent directories.",
-                result.Warnings);
-            Assert.Null(result.LocalSchemaPath);
-        }
-        finally
+        Assert.Empty(result.Errors);
+        Assert.False(result.ExtendedProfile);
+        Assert.Contains("Recommended file missing: .aicontext/architecture.md.", result.Warnings);
+        Assert.Contains("Recommended file missing: .aicontext/decisions.md.", result.Warnings);
+        Assert.Contains("Recommended file missing: .aicontext/constraints.md.", result.Warnings);
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithAllRecommendedFiles_IsExtendedProfileWithoutWarnings()
+    {
+        WriteMinimalContext();
+        WriteFile("architecture.md", "Why this architecture.");
+        WriteFile("decisions.md", "Decision 1.");
+        WriteFile("constraints.md", "Never do X.");
+
+        var result = Validate();
+
+        Assert.Empty(result.Errors);
+        Assert.Empty(result.Warnings);
+        Assert.True(result.ExtendedProfile);
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithEmptyRecommendedFile_WarnsAndIsNotExtended()
+    {
+        WriteMinimalContext();
+        WriteFile("architecture.md", "Why.");
+        WriteFile("decisions.md", "Decision.");
+        WriteFile("constraints.md", "   \n");
+
+        var result = Validate();
+
+        Assert.Contains("Recommended file is empty: .aicontext/constraints.md.", result.Warnings);
+        Assert.False(result.ExtendedProfile);
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithoutSchemaProperty_Warns()
+    {
+        WriteContext(new { specVersion = ExpectedSpecVersion, project = new { name = "sample" } });
+
+        var result = Validate();
+
+        Assert.Empty(result.Errors);
+        Assert.Contains("context.json is missing '$schema'.", result.Warnings);
+    }
+
+    [Fact]
+    public void ValidateDirectory_ChecksContextJsonAgainstSchema()
+    {
+        WriteContext(new
         {
-            Directory.Delete(root, true);
-        }
+            @schema = CanonicalSchemaUrl,
+            specVersion = "0.2.0",
+            project = new { name = "sample", description = "", stack = new[] { "a", "a" }, bogus = 1 },
+            extra = true
+        });
+
+        var errors = Validate().Errors;
+
+        Assert.Contains(errors, e => e.StartsWith("context.json /specVersion:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /project/description:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /project/stack:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /project/bogus:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /extra:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithMissingRequiredProperties_ReturnsErrors()
+    {
+        WriteContext(new { @schema = CanonicalSchemaUrl });
+
+        var errors = Validate().Errors;
+
+        Assert.Contains(errors, e => e.Contains("specVersion", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Contains("project", StringComparison.Ordinal));
     }
 
     [Fact]
     public void ValidateDirectory_WhenTargetsAreInvalid_ReturnsExpectedErrors()
     {
-        var root = CreateTempDirectory();
-        try
+        WriteContext(new
         {
-            WriteContextFiles(root, new
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            exports = new
             {
-                @schema = CanonicalSchemaUrl,
-                specVersion = ExpectedSpecVersion,
-                project = new { name = "sample" },
-                exports = new
-                {
-                    targets = new object[] { "agents", "agents", "unknown", 123 },
-                    defaultTarget = "claude"
-                }
-            });
-            WriteSchemaFile(root);
+                targets = new object[] { "agents", "agents", "unknown", 123 },
+                defaultTarget = "claude"
+            }
+        });
 
-            var result = ContextValidator.ValidateDirectory(root, CanonicalSchemaUrl, ExpectedSpecVersion, AllowedTargets);
+        var errors = Validate().Errors;
 
-            Assert.Contains("exports.targets contains duplicate target 'agents'.", result.Errors);
-            Assert.Contains("exports.targets contains unsupported target 'unknown'.", result.Errors);
-            Assert.Contains("exports.targets must contain only strings.", result.Errors);
-            Assert.Contains("exports.defaultTarget must be 'all' or one of exports.targets.", result.Errors);
-        }
-        finally
-        {
-            Directory.Delete(root, true);
-        }
+        Assert.Contains(errors, e => e.StartsWith("context.json /exports/targets:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /exports/targets/2:", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.StartsWith("context.json /exports/targets/3:", StringComparison.Ordinal));
+        Assert.Contains("exports.defaultTarget must be 'all' or one of exports.targets.", errors);
     }
 
     [Fact]
     public void ValidateDirectory_WhenLastReviewedHasInvalidFormat_ReturnsError()
     {
-        var root = CreateTempDirectory();
-        try
+        WriteContext(new
         {
-            WriteContextFiles(root, new
-            {
-                @schema = CanonicalSchemaUrl,
-                specVersion = ExpectedSpecVersion,
-                project = new { name = "sample" },
-                metadata = new
-                {
-                    lastReviewed = "01-11-2026"
-                }
-            });
-            WriteSchemaFile(root);
+            @schema = CanonicalSchemaUrl,
+            specVersion = ExpectedSpecVersion,
+            project = new { name = "sample" },
+            metadata = new { lastReviewed = "01-11-2026" }
+        });
 
-            var result = ContextValidator.ValidateDirectory(root, CanonicalSchemaUrl, ExpectedSpecVersion, AllowedTargets);
+        var errors = Validate().Errors;
 
-            Assert.Contains("metadata.lastReviewed must use ISO date format yyyy-MM-dd.", result.Errors);
-        }
-        finally
-        {
-            Directory.Delete(root, true);
-        }
+        Assert.Contains(errors, e => e.StartsWith("context.json /metadata/lastReviewed:", StringComparison.Ordinal));
     }
 
-    private static string CreateTempDirectory()
+    [Fact]
+    public void ValidateDirectory_WithWhitespaceProjectName_ReturnsError()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"aicontext-tests-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(path);
-        return path;
+        WriteContext(new { @schema = CanonicalSchemaUrl, specVersion = ExpectedSpecVersion, project = new { name = "  " } });
+
+        Assert.Contains("project.name must not be whitespace only.", Validate().Errors);
     }
 
-    private static void WriteContextFiles(string rootPath, object contextJson)
+    [Fact]
+    public void ValidateDirectory_WithInvalidJson_ReturnsErrorAndDoesNotThrow()
     {
-        var contextDirectory = Path.Combine(rootPath, ".aicontext");
-        Directory.CreateDirectory(contextDirectory);
+        WriteFile("README.md", "# Project: sample\n\nSummary.");
+        WriteFile("context.json", "{ not json");
 
-        var readmePath = Path.Combine(contextDirectory, "README.md");
-        File.WriteAllText(readmePath, "# Project: sample\n\nSummary.");
+        var result = Validate();
 
-        var contextPath = Path.Combine(contextDirectory, "context.json");
+        Assert.Contains(result.Errors, e => e.StartsWith("Invalid JSON in", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_WithSecret_WarnsWithoutRevealingValue()
+    {
+        WriteMinimalContext();
+        WriteFile("README.md", "# Project: sample\n\npassword = hunter2\n");
+
+        var warnings = Validate().Warnings;
+
+        var warning = Assert.Single(warnings, w => w.StartsWith("Possible secret", StringComparison.Ordinal));
+        Assert.Contains(".aicontext/README.md:3", warning);
+        Assert.DoesNotContain("hunter2", warning);
+    }
+
+    private ContextValidationResult Validate() => ContextValidator.ValidateDirectory(_root, CanonicalSchemaUrl);
+
+    private void WriteMinimalContext()
+    {
+        WriteContext(new { @schema = CanonicalSchemaUrl, specVersion = ExpectedSpecVersion, project = new { name = "sample" } });
+    }
+
+    private void WriteContext(object contextJson)
+    {
+        WriteFile("README.md", "# Project: sample\n\nSummary.");
         var json = JsonSerializer.Serialize(contextJson, new JsonSerializerOptions { WriteIndented = true })
             .Replace("\"schema\":", "\"$schema\":", StringComparison.Ordinal);
-        File.WriteAllText(contextPath, json);
+        WriteFile("context.json", json);
     }
 
-    private static void WriteSchemaFile(string rootPath)
+    private void WriteFile(string name, string content)
     {
-        var schemaDirectory = Path.Combine(rootPath, "schema", "v1");
-        Directory.CreateDirectory(schemaDirectory);
-        File.WriteAllText(Path.Combine(schemaDirectory, "context.schema.json"), "{}");
+        File.WriteAllText(Path.Combine(_root, ".aicontext", name), content);
     }
 }

@@ -17,7 +17,7 @@ public class ContextExporterTests
     [Fact]
     public void BuildAgents_StripsReadmeHeading_AndContainsSections()
     {
-        var markdown = ContextExporter.BuildAgents(Context, "2026-11-01T00:00:00Z");
+        var markdown = ContextExporter.BuildAgents(Context);
 
         Assert.Contains("# sample-project", markdown);
         Assert.DoesNotContain("# Project: sample-project", markdown);
@@ -28,7 +28,7 @@ public class ContextExporterTests
     [Fact]
     public void BuildCursor_ContainsFrontmatterAndMetadata()
     {
-        var markdown = ContextExporter.BuildCursor(Context, "2026-11-01T00:00:00Z");
+        var markdown = ContextExporter.BuildCursor(Context);
 
         Assert.Contains("alwaysApply: true", markdown);
         Assert.Contains("description: \"Project constraints and patterns for sample-project\"", markdown);
@@ -36,9 +36,53 @@ public class ContextExporterTests
     }
 
     [Fact]
+    public void Build_IsDeterministic_AndHasNoTimestamp()
+    {
+        foreach (var target in ExportTargets.All)
+        {
+            var first = target.Build(Context);
+            var second = target.Build(Context);
+
+            Assert.Equal(first, second);
+            Assert.DoesNotContain("Generated:", first);
+            Assert.Contains("Source-hash: sha256:", first);
+            Assert.Contains(ContextExporter.GeneratedMarker, first);
+        }
+    }
+
+    [Fact]
+    public void Build_UsesLfOnly_RegardlessOfInputLineEndings()
+    {
+        var crlf = new ExportContext(
+            "sample-project",
+            "# Project: sample-project\r\n\r\nShort summary.\r\n",
+            "Line one.\r\nLine two.",
+            null,
+            null,
+            null,
+            null);
+
+        var markdown = ContextExporter.BuildAgents(crlf);
+
+        Assert.DoesNotContain("\r", markdown);
+        Assert.EndsWith("Line two.\n", markdown);
+    }
+
+    [Fact]
+    public void SourceHash_IgnoresLineEndings_ButChangesWithContent()
+    {
+        var lf = Context with { Architecture = "a\nb" };
+        var crlf = Context with { Architecture = "a\r\nb" };
+        var different = Context with { Architecture = "a\nc" };
+
+        Assert.Equal(ContextExporter.ComputeSourceHash(lf), ContextExporter.ComputeSourceHash(crlf));
+        Assert.NotEqual(ContextExporter.ComputeSourceHash(lf), ContextExporter.ComputeSourceHash(different));
+    }
+
+    [Fact]
     public void BuildAider_ContainsExpectedHeading()
     {
-        var markdown = ContextExporter.BuildAider(Context, "2026-11-01T00:00:00Z");
+        var markdown = ContextExporter.BuildAider(Context);
 
         Assert.Contains("# Aider Conventions for sample-project", markdown);
         Assert.Contains("Short summary.", markdown);
