@@ -2,6 +2,12 @@
 
 All notable changes to the AIContext specification repository will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Standalone CLI binaries (self-contained, single-file, no .NET required) are attached to each GitHub Release for Windows x64, Linux x64/arm64 and macOS x64/arm64, together with `SHA256SUMS.txt`. Built and smoke-tested by the new `release-binaries.yml` workflow. The `AIContext.CLI` NuGet tool remains available.
+
 ## [0.3.0] - 2026-11-02
 
 ### Added
