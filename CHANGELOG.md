@@ -12,6 +12,7 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ### Added
 
+- English [user manual](./docs/user-manual.md), published on the website together with a "Documentation" section on the landing page.
 - Standalone CLI binaries (self-contained, single-file, no .NET required) are attached to each GitHub Release for Windows x64, Linux x64/arm64 and macOS x64/arm64, together with `SHA256SUMS.txt`. Built and smoke-tested by the new `release-binaries.yml` workflow. The `AIContext.CLI` NuGet tool remains available.
 
 ## [0.3.0] - 2026-11-02
