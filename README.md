@@ -62,7 +62,23 @@ dotnet test .\tests\AIContext.Tests\AIContext.Tests.csproj -c Release
 
 ## CLI (MVP)
 
-Install as a .NET tool:
+### Standalone binary (no .NET required)
+
+Download the archive for your platform from the [latest release](https://github.com/aicontext-dev/aicontext/releases/latest), extract it and put `aicontext` on your `PATH`:
+
+| Platform | Asset |
+|----------|-------|
+| Windows x64 | `aicontext-win-x64.zip` |
+| Linux x64 | `aicontext-linux-x64.tar.gz` |
+| Linux arm64 | `aicontext-linux-arm64.tar.gz` |
+| macOS Intel | `aicontext-osx-x64.tar.gz` |
+| macOS Apple Silicon | `aicontext-osx-arm64.tar.gz` |
+
+Verify the download against `SHA256SUMS.txt` from the same release. The binaries are not code-signed yet: on macOS run `xattr -d com.apple.quarantine aicontext` if Gatekeeper blocks a browser-downloaded file, and Windows SmartScreen may show a warning.
+
+### .NET tool
+
+If you already have the .NET SDK:
 
 ```powershell
 dotnet tool install --global AIContext.CLI

@@ -1,0 +1,114 @@
+name: Release Binaries
+
+# Attaches standalone (self-contained, single-file) CLI binaries to a GitHub Release.
+# Create the release (tag vX.Y.Z) first; this workflow then uploads the assets.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to attach binaries to (for example v0.3.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: win-x64,     os: windows-latest,   archive: zip }
+          - { rid: linux-x64,   os: ubuntu-latest,    archive: tar.gz }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm, archive: tar.gz }
+          - { rid: osx-x64,     os: macos-15-intel,   archive: tar.gz }
+          - { rid: osx-arm64,   os: macos-latest,     archive: tar.gz }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      # No trimming/AOT: JsonSchema.Net relies on reflection.
+      # Invariant globalization removes the libicu dependency on Linux.
+      - name: Publish single-file binary
+        run: |
+          dotnet publish src/AIContext.CLI/AIContext.CLI.csproj \
+            -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true \
+            -p:PublishTrimmed=false \
+            -p:InvariantGlobalization=true \
+            -p:DebugType=none \
+            -o publish
+
+      - name: Stage binary
+        run: |
+          mkdir -p stage
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then
+            mv publish/AIContext.CLI.exe stage/aicontext.exe
+          else
+            mv publish/AIContext.CLI stage/aicontext
+            chmod +x stage/aicontext
+          fi
+          cp LICENSE stage/LICENSE
+
+      - name: Smoke test
+        run: |
+          bin="$PWD/stage/aicontext"
+          if [ "${{ matrix.rid }}" = "win-x64" ]; then bin="$bin.exe"; fi
+          work="$(mktemp -d)"
+          "$bin" --help
+          "$bin" init --path "$work" --name smoke-test
+          "$bin" validate --path "$work"
+          "$bin" export --path "$work" --target all
+          "$bin" export --path "$work" --target all --check
+          "$bin" validate --strict
+
+      - name: Create archive
+        run: |
+          mkdir -p dist
+          name="aicontext-${{ matrix.rid }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            powershell -NoProfile -Command "Compress-Archive -Path stage/* -DestinationPath dist/$name.zip"
+          else
+            tar -czf "dist/$name.tar.gz" -C stage .
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aicontext-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  upload:
+    name: Attach to release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create checksums
+        working-directory: dist
+        run: sha256sum aicontext-* > SHA256SUMS.txt
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "${{ github.repository }}"
