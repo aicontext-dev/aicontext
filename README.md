@@ -98,7 +98,7 @@ Run:
 aicontext --help
 ```
 
-Quickstart:
+Quickstart (full guide: [User manual](./docs/user-manual.md)):
 
 ```powershell
 aicontext init --name my-project
