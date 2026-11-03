@@ -2,7 +2,13 @@
 
 All notable changes to the AIContext specification repository will be documented in this file.
 
+Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI`, standalone binaries). The specification has its own version (`0.1.0-draft`, `specVersion` `0.1.0`); format changes are marked as such below. See [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version).
+
 ## [Unreleased]
+
+### Changed
+
+- Documented that specification and tool versions are independent (SPEC 9.1, README, this file), including which tool version introduced which format changes. No change to the format or to `specVersion`.
 
 ### Added
 

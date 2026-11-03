@@ -2,7 +2,7 @@
 
 Status: DRAFT  
 Version: 0.1.0-draft  
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 ---
 
@@ -252,6 +252,20 @@ AIContext specification versioning follows Semantic Versioning:
 - **MAJOR**: breaking changes
 
 Tooling SHOULD reject unknown MAJOR versions by default and MAY offer explicit override.
+
+### 9.1 Specification version vs. tool version
+
+The specification and the reference tooling are versioned independently:
+
+- **Specification version** (`Version` in this file, `specVersion` in `context.json`, the schema under `schema/v1/`) identifies the format. It changes only when the format changes.
+- **Tool version** (the `AIContext` and `AIContext.CLI` packages and the standalone binaries) identifies a software release. It also changes for bug fixes and features that do not alter the format.
+
+While the specification is a draft (`0.x`), additions may be made within the current version and `specVersion` stays `0.1.0`. The first change that makes existing files invalid or changes their meaning bumps the specification version, and the schema is widened so that files declaring older supported versions remain valid.
+
+| Tool version | Specification version | Format changes introduced |
+|--------------|-----------------------|---------------------------|
+| 0.1.0 – 0.2.0 | 0.1.0-draft | Initial format |
+| 0.3.0 | 0.1.0-draft | Rules (4.4), safe overwrite (6.3), layouts and nested `AGENTS.md` (6.4), `devin` target |
 
 ## 10. Security and privacy guidance
 
