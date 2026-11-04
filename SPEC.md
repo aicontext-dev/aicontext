@@ -268,6 +268,7 @@ While the specification is a draft (`0.x`), additions may be made within the cur
 |--------------|-----------------------|---------------------------|
 | 0.1.0 – 0.2.0 | 0.1.0-draft | Initial format |
 | 0.3.0 | 0.1.0-draft | Rules (4.4), safe overwrite (6.3), layouts and nested `AGENTS.md` (6.4), `devin` target |
+| 0.4.0 | 0.1.0-draft | None; `exports.defaultTarget` semantics clarified (6.1) |
 
 ## 10. Security and privacy guidance
 

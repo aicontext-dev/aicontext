@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>AIContext.CLI</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Authors>aicontext.dev</Authors>
     <Description>CLI tool for the AIContext open format standard.</Description>
     <PackageTags>ai;context;copilot;cursor;claude;llm;developer-tools;cli</PackageTags>

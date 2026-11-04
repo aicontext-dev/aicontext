@@ -6,6 +6,8 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-04
+
 ### Changed
 
 - Documented that specification and tool versions are independent (SPEC 9.1, README, this file), including which tool version introduced which format changes. No change to the format or to `specVersion`.
