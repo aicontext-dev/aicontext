@@ -13,6 +13,7 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 ### Added
 
 - `aicontext --version` (also `-v` and `version`) prints the tool version and the specification version.
+- `aicontext export` now uses `exports.defaultTarget` when `--target` is not given (`--target` always takes precedence; `all` means the targets from `exports.targets`; without either, export still fails with a message naming both options). The meaning of `defaultTarget` is now documented in SPEC 6.1; the schema is unchanged.
 - `aicontext init --profile <core|extended>` (default `core`). `extended` also creates starter `architecture.md`, `decisions.md` and `constraints.md`, so the result passes `validate --strict` as the Extended profile. Init logic moved from the CLI to `ProjectInitializer` in the core library. No change to the format.
 - English [user manual](./docs/user-manual.md), published on the website together with a "Documentation" section on the landing page.
 - Standalone CLI binaries (self-contained, single-file, no .NET required) are attached to each GitHub Release for Windows x64, Linux x64/arm64 and macOS x64/arm64, together with `SHA256SUMS.txt`. Built and smoke-tested by the new `release-binaries.yml` workflow. The `AIContext.CLI` NuGet tool remains available. The binaries use partial trimming (`TrimMode=partial`, about 11 MB instead of about 36 MB for Windows x64); the smoke test also covers `--version`, the extended profile and rejection of an invalid `context.json`.
