@@ -171,6 +171,8 @@ Implementations SHOULD NOT include a generation timestamp, because it makes ever
 
 ### 6.1 Export targets
 
+An implementation that exports without an explicitly requested target (for example a CLI invoked without `--target`) SHOULD use `exports.defaultTarget`. An explicitly requested target always takes precedence. `defaultTarget: "all"` means the targets listed in `exports.targets` (or the implementation's default set when `exports.targets` is not set); any other value means that single target only. When neither is available the implementation SHOULD fail with a message that names both options, and SHOULD report that the value came from `context.json`.
+
 - `agents` -> `AGENTS.md`
 - `copilot` -> `.github/copilot-instructions.md` (and `.github/instructions/*.instructions.md` in the split layout)
 - `claude` -> `CLAUDE.md` (and `.claude/rules/*.md` in the split layout)

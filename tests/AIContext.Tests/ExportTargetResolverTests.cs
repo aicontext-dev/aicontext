@@ -19,6 +19,27 @@ public class ExportTargetResolverTests
     private static readonly HashSet<string> AllowedTargets = new(SupportedTargets, StringComparer.Ordinal);
 
     [Fact]
+    public void ResolveDefaultTarget_ReturnsConfiguredValue()
+    {
+        using var document = JsonDocument.Parse("""{ "exports": { "defaultTarget": "cursor" } }""");
+
+        Assert.Equal("cursor", ExportTargetResolver.ResolveDefaultTarget(document.RootElement));
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{ "exports": {} }""")]
+    [InlineData("""{ "exports": { "defaultTarget": "" } }""")]
+    [InlineData("""{ "exports": { "defaultTarget": 1 } }""")]
+    [InlineData("""{ "exports": "all" }""")]
+    public void ResolveDefaultTarget_NotConfigured_ReturnsNull(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+
+        Assert.Null(ExportTargetResolver.ResolveDefaultTarget(document.RootElement));
+    }
+
+    [Fact]
     public void ResolveTargetsForAll_UsesConfiguredTargets_WhenPresent()
     {
         using var document = JsonDocument.Parse("""

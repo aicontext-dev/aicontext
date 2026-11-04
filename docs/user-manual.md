@@ -294,7 +294,7 @@ Extended example:
 | `project.primaryLanguage` | no | main language |
 | `project.stack` | no | list of technologies (no duplicates) |
 | `exports.targets` | no | which tools are generated for with `--target all` |
-| `exports.defaultTarget` | no | `all` or one of `targets` (currently informational and validated only; `export` always requires `--target`) |
+| `exports.defaultTarget` | no | `all` or one of `targets`; used by `export` when `--target` is not given (`--target` always wins). `all` = the targets from `exports.targets`; a single target = only that target |
 | `exports.layout` | no | `single` (default) or `split` (chapter 7) |
 | `exports.nestedAgents` | no | `true` = nested `AGENTS.md` (chapter 8; only with `split`) |
 | `metadata.lastReviewed` | no | date the content was last reviewed, `YYYY-MM-DD` |
@@ -335,10 +335,11 @@ All commands have an optional `--path <directory>` (the current directory by def
 ### `aicontext init`
 
 ```powershell
-aicontext init [--path <directory>] [--name <name>] [--force]
+aicontext init [--path <directory>] [--name <name>] [--profile core|extended] [--force]
+aicontext --version
 ```
 
-Creates `.aicontext/README.md` and `.aicontext/context.json`. If they already exist, it fails; `--force` overwrites them.
+Creates `.aicontext/README.md` and `.aicontext/context.json` (Core profile, the default). With `--profile extended` it also creates starter `architecture.md`, `decisions.md` and `constraints.md` (replace the `TODO` markers with real content), so `validate` reports the Extended profile. If any of the files already exist, it fails and writes nothing; `--force` overwrites them. `aicontext --version` prints the tool version and the specification version.
 
 ### `aicontext validate`
 
@@ -359,10 +360,10 @@ Exit codes: `0` = OK, `1` = error. With `--strict`, warnings count as errors (us
 ### `aicontext export`
 
 ```powershell
-aicontext export --target <target> [--path <directory>] [--layout single|split] [--force] [--dry-run] [--check]
+aicontext export [--target <target>] [--path <directory>] [--layout single|split] [--force] [--dry-run] [--check]
 ```
 
-`<target>` is `agents`, `copilot`, `claude`, `cursor`, `windsurf`, `devin`, `aider` or `all`.
+`<target>` is `agents`, `copilot`, `claude`, `cursor`, `windsurf`, `devin`, `aider` or `all`. `--target` is optional when `exports.defaultTarget` is set in `context.json`: the tool then uses that value and prints `Using exports.defaultTarget '…' from .aicontext/context.json.`. An explicit `--target` always wins. If neither is given, the command fails.
 
 | Option | Meaning |
 |---|---|

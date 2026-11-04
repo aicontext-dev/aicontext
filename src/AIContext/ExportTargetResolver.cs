@@ -8,6 +8,22 @@ public sealed record ExportTargetResolutionResult(
 
 public static class ExportTargetResolver
 {
+    // Returns exports.defaultTarget when it is set to a string; callers validate the value.
+    public static string? ResolveDefaultTarget(JsonElement root)
+    {
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("exports", out var exports) &&
+            exports.ValueKind == JsonValueKind.Object &&
+            exports.TryGetProperty("defaultTarget", out var defaultTarget) &&
+            defaultTarget.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(defaultTarget.GetString()))
+        {
+            return defaultTarget.GetString();
+        }
+
+        return null;
+    }
+
     public static ExportTargetResolutionResult ResolveTargetsForAll(
         JsonElement root,
         IReadOnlyList<string> supportedTargets,
