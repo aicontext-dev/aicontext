@@ -16,7 +16,8 @@ aicontext --help
 
 Available commands:
 
-- `aicontext init [--path <directory>] [--name <project-name>] [--force]`
+- `aicontext init [--path <directory>] [--name <project-name>] [--profile <core|extended>] [--force]`
+- `aicontext --version`
 - `aicontext validate [--path <directory>] [--strict]`
 - `aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider|all> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]`
 - `aicontext status [--path <directory>] [--layout <single|split>]` (context size per tool and export sync state)

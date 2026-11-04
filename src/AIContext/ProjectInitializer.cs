@@ -1,0 +1,113 @@
+using System.Text;
+using System.Text.Json;
+
+namespace AIContext;
+
+public enum InitProfile
+{
+    Core,
+    Extended
+}
+
+public sealed record InitResult(IReadOnlyList<string> Created, IReadOnlyList<string> Conflicts);
+
+public static class ProjectInitializer
+{
+    public static bool TryParseProfile(string? value, out InitProfile profile)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case null or "" or "core":
+                profile = InitProfile.Core;
+                return true;
+            case "extended":
+                profile = InitProfile.Extended;
+                return true;
+            default:
+                profile = InitProfile.Core;
+                return false;
+        }
+    }
+
+    // Writes nothing and reports the existing files when any target file exists and force is not set.
+    public static InitResult Initialize(
+        string basePath,
+        string projectName,
+        InitProfile profile,
+        string schemaUrl,
+        string specVersion,
+        bool force)
+    {
+        var contextDirectory = Path.Combine(basePath, ".aicontext");
+        var files = BuildFiles(contextDirectory, projectName, profile, schemaUrl, specVersion);
+
+        var conflicts = files.Keys.Where(File.Exists).ToList();
+        if (conflicts.Count > 0 && !force)
+        {
+            return new InitResult([], conflicts);
+        }
+
+        Directory.CreateDirectory(contextDirectory);
+        foreach (var (path, content) in files)
+        {
+            File.WriteAllText(path, content, new UTF8Encoding(false));
+        }
+
+        return new InitResult(files.Keys.ToList(), []);
+    }
+
+    private static Dictionary<string, string> BuildFiles(
+        string contextDirectory,
+        string projectName,
+        InitProfile profile,
+        string schemaUrl,
+        string specVersion)
+    {
+        var contextJson = BuildContextJson(projectName, schemaUrl, specVersion);
+
+        var files = new Dictionary<string, string>
+        {
+            [Path.Combine(contextDirectory, "README.md")] = ReadmeTemplate(projectName),
+            [Path.Combine(contextDirectory, "context.json")] = contextJson + "\n"
+        };
+
+        if (profile == InitProfile.Extended)
+        {
+            files[Path.Combine(contextDirectory, "architecture.md")] = ArchitectureTemplate;
+            files[Path.Combine(contextDirectory, "decisions.md")] = DecisionsTemplate;
+            files[Path.Combine(contextDirectory, "constraints.md")] = ConstraintsTemplate;
+        }
+
+        return files;
+    }
+
+    // Utf8JsonWriter instead of JsonSerializer keeps this safe for trimmed binaries.
+    private static string BuildContextJson(string projectName, string schemaUrl, string specVersion)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("$schema", schemaUrl);
+            writer.WriteString("specVersion", specVersion);
+            writer.WriteStartObject("project");
+            writer.WriteString("name", projectName);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static string ReadmeTemplate(string projectName) =>
+        $"# Project: {projectName}\n\nBrief project summary.\n\n**Tech stack:** TODO  \n**Architecture:** TODO  \n**Testing:** TODO\n";
+
+    private const string ArchitectureTemplate =
+        "## Overview\n\nTODO: describe the main components and how they interact.\n\n## Layers and boundaries\n\nTODO: which code may depend on which, and why.\n";
+
+    private const string DecisionsTemplate =
+        "Format: context, decision, consequence. Newest decisions last.\n\n### D1. TODO: title of the first decision\n**Context:** TODO\n**Decision:** TODO\n**Consequence:** TODO\n";
+
+    private const string ConstraintsTemplate =
+        "Hard rules for AI assistants and contributors.\n\n- TODO: a rule that must never be violated.\n";
+}

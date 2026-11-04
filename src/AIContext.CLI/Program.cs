@@ -14,6 +14,12 @@ if (args.Length == 0 || IsHelp(args[0]))
     return 0;
 }
 
+if (IsVersion(args[0]))
+{
+    PrintVersion();
+    return 0;
+}
+
 var command = args[0];
 var options = ParseOptions(args.Skip(1).ToArray());
 if (options.Error is not null)
@@ -49,56 +55,28 @@ int RunInit(Dictionary<string, string?> options)
         projectName = new DirectoryInfo(basePath).Name;
     }
 
-    var contextDirectory = Path.Combine(basePath, ".aicontext");
-    var readmePath = Path.Combine(contextDirectory, "README.md");
-    var contextPath = Path.Combine(contextDirectory, "context.json");
-
-    Directory.CreateDirectory(contextDirectory);
-
-    if (!force)
+    if (!ProjectInitializer.TryParseProfile(GetOption(options, "profile"), out var profile))
     {
-        if (File.Exists(readmePath))
-        {
-            Console.Error.WriteLine($"File already exists: {readmePath}. Use --force to overwrite.");
-            return 1;
-        }
-
-        if (File.Exists(contextPath))
-        {
-            Console.Error.WriteLine($"File already exists: {contextPath}. Use --force to overwrite.");
-            return 1;
-        }
+        Console.Error.WriteLine($"Unknown profile '{GetOption(options, "profile")}'. Use core or extended.");
+        return 1;
     }
 
-    var readmeContent = $$"""
-                        # Project: {{projectName}}
-                        
-                        Brief project summary.
-                        
-                        **Tech stack:** TODO  
-                        **Architecture:** TODO  
-                        **Testing:** TODO
-                        """;
-
-    var contextDocument = new Dictionary<string, object?>
+    var result = ProjectInitializer.Initialize(basePath, projectName, profile, CanonicalSchemaUrl, ExpectedSpecVersion, force);
+    if (result.Conflicts.Count > 0)
     {
-        ["$schema"] = CanonicalSchemaUrl,
-        ["specVersion"] = ExpectedSpecVersion,
-        ["project"] = new Dictionary<string, object?>
+        foreach (var conflict in result.Conflicts)
         {
-            ["name"] = projectName
+            Console.Error.WriteLine($"File already exists: {conflict}. Use --force to overwrite.");
         }
-    };
-    var contextJson = JsonSerializer.Serialize(contextDocument, new JsonSerializerOptions
+
+        return 1;
+    }
+
+    foreach (var created in result.Created)
     {
-        WriteIndented = true
-    });
+        Console.WriteLine($"Created: {created}");
+    }
 
-    File.WriteAllText(readmePath, readmeContent + Environment.NewLine, Encoding.UTF8);
-    File.WriteAllText(contextPath, contextJson + Environment.NewLine, new UTF8Encoding(false));
-
-    Console.WriteLine($"Created: {readmePath}");
-    Console.WriteLine($"Created: {contextPath}");
     return 0;
 }
 
@@ -451,15 +429,35 @@ static bool IsHelp(string arg)
     return arg is "-h" or "--help" or "help";
 }
 
+static bool IsVersion(string arg)
+{
+    return arg is "-v" or "--version" or "version";
+}
+
+void PrintVersion()
+{
+    var informational = System.Reflection.Assembly.GetExecutingAssembly()
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+        .FirstOrDefault()?.InformationalVersion;
+    var version = informational?.Split('+')[0] ?? "unknown";
+    Console.WriteLine($"aicontext {version}");
+    Console.WriteLine($"Specification version: {ExpectedSpecVersion}");
+}
+
 static void PrintHelp()
 {
     Console.WriteLine("AIContext CLI");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  aicontext init [--path <directory>] [--name <project-name>] [--force]");
+    Console.WriteLine("  aicontext init [--path <directory>] [--name <project-name>] [--profile <core|extended>] [--force]");
     Console.WriteLine("  aicontext validate [--path <directory>] [--strict]");
     Console.WriteLine("  aicontext export --target <agents|copilot|claude|cursor|windsurf|devin|aider|all> [--path <directory>] [--layout <single|split>] [--force] [--dry-run] [--check]");
     Console.WriteLine("  aicontext status [--path <directory>] [--layout <single|split>]");
+    Console.WriteLine("  aicontext --version");
+    Console.WriteLine();
+    Console.WriteLine("Init options:");
+    Console.WriteLine("  --profile   core (default): README.md and context.json. extended: also architecture.md, decisions.md and constraints.md.");
     Console.WriteLine();
     Console.WriteLine("Status:");
     Console.WriteLine("  Shows how much context each tool loads (always on vs. scoped/on-demand) and whether exports are in sync.");

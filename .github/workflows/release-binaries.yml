@@ -39,7 +39,8 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # No trimming/AOT: JsonSchema.Net relies on reflection.
+      # Partial trimming only trims framework assemblies; AIContext and JsonSchema.Net
+      # (reflection-based) are left intact. Full trimming/AOT is not used for that reason.
       # Invariant globalization removes the libicu dependency on Linux.
       - name: Publish single-file binary
         run: |
@@ -47,7 +48,8 @@ jobs:
             -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained true \
             -p:PublishSingleFile=true \
             -p:EnableCompressionInSingleFile=true \
-            -p:PublishTrimmed=false \
+            -p:PublishTrimmed=true \
+            -p:TrimMode=partial \
             -p:InvariantGlobalization=true \
             -p:DebugType=none \
             -o publish
@@ -69,11 +71,26 @@ jobs:
           if [ "${{ matrix.rid }}" = "win-x64" ]; then bin="$bin.exe"; fi
           work="$(mktemp -d)"
           "$bin" --help
+          "$bin" --version
           "$bin" init --path "$work" --name smoke-test
           "$bin" validate --path "$work"
           "$bin" export --path "$work" --target all
           "$bin" export --path "$work" --target all --check
           "$bin" validate --strict
+
+          # Extended profile must pass strict validation.
+          ext="$(mktemp -d)"
+          "$bin" init --path "$ext" --name smoke-ext --profile extended
+          "$bin" validate --path "$ext" --strict
+
+          # Schema validation must still reject invalid input in the trimmed binary.
+          bad="$(mktemp -d)"
+          "$bin" init --path "$bad" --name smoke-bad
+          echo '{"specVersion":"0.1.0","project":{}}' > "$bad/.aicontext/context.json"
+          if "$bin" validate --path "$bad"; then
+            echo "validate accepted an invalid context.json"
+            exit 1
+          fi
 
       - name: Create archive
         run: |

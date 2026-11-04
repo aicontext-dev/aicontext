@@ -335,10 +335,11 @@ All commands have an optional `--path <directory>` (the current directory by def
 ### `aicontext init`
 
 ```powershell
-aicontext init [--path <directory>] [--name <name>] [--force]
+aicontext init [--path <directory>] [--name <name>] [--profile core|extended] [--force]
+aicontext --version
 ```
 
-Creates `.aicontext/README.md` and `.aicontext/context.json`. If they already exist, it fails; `--force` overwrites them.
+Creates `.aicontext/README.md` and `.aicontext/context.json` (Core profile, the default). With `--profile extended` it also creates starter `architecture.md`, `decisions.md` and `constraints.md` (replace the `TODO` markers with real content), so `validate` reports the Extended profile. If any of the files already exist, it fails and writes nothing; `--force` overwrites them. `aicontext --version` prints the tool version and the specification version.
 
 ### `aicontext validate`
 
