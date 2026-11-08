@@ -4,7 +4,10 @@ namespace AIContext;
 
 public sealed record LoadedContext(string BasePath, JsonElement Root, ExportContext Context);
 
-public sealed record ContextLoadResult(LoadedContext? Loaded, IReadOnlyList<string> Errors);
+public sealed record ContextLoadResult(LoadedContext? Loaded, IReadOnlyList<Diagnostic> Diagnostics)
+{
+    public IReadOnlyList<string> Errors => Diagnostics.ErrorMessages();
+}
 
 // Reads .aicontext/ into the model used for exporting and reporting.
 public static class ContextLoader
@@ -20,7 +23,7 @@ public static class ContextLoader
         var validation = ContextValidator.ValidateDirectory(basePath, ContextSchema.CanonicalUrl);
         if (validation.Errors.Count > 0)
         {
-            return new ContextLoadResult(null, validation.Errors);
+            return new ContextLoadResult(null, validation.Diagnostics);
         }
 
         using var document = JsonDocument.Parse(File.ReadAllText(contextPath));
@@ -44,7 +47,7 @@ public static class ContextLoader
             ReadSection(contextDirectory, "glossary.md"),
             ruleLoad.Rules);
 
-        return new ContextLoadResult(new LoadedContext(basePath, root, exportContext), []);
+        return new ContextLoadResult(new LoadedContext(basePath, root, exportContext), validation.Diagnostics);
     }
 
     private static string? ReadProjectName(JsonElement root)
