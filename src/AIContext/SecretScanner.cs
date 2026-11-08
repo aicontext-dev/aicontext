@@ -4,12 +4,18 @@ namespace AIContext;
 
 public sealed record SecretFinding(string File, int Line, string Kind);
 
+// A file the scanner could not (completely) check. Such files are reported, never skipped silently.
+public sealed record UnscannedFile(string File, string Reason);
+
+public sealed record SecretScanReport(IReadOnlyList<SecretFinding> Findings, IReadOnlyList<UnscannedFile> Unscanned);
+
+// A heuristic lint for common secret patterns in text files. It does not find everything and is not a guarantee
+// that no secret is present.
 public static class SecretScanner
 {
     // Add this marker to a line to tell the scanner it is an intentional example.
     public const string AllowMarker = "aicontext:allow-secret";
 
-    private const long MaxFileSize = 512 * 1024;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
 
     private static readonly HashSet<string> ScannedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -41,12 +47,18 @@ public static class SecretScanner
         "your", "example", "changeme", "placeholder", "redacted", "todo", "dummy", "sample", "password", "secret", "token"
     ];
 
-    public static IReadOnlyList<SecretFinding> ScanDirectory(string directory)
+    public static IReadOnlyList<SecretFinding> ScanDirectory(string directory) =>
+        ScanDirectoryReport(directory).Findings;
+
+    // Files are read line by line, so there is no size limit. Only text files (ScannedExtensions) are scanned;
+    // anything that cannot be read or checked completely is listed in Unscanned instead of being skipped silently.
+    public static SecretScanReport ScanDirectoryReport(string directory)
     {
         var findings = new List<SecretFinding>();
+        var unscanned = new List<UnscannedFile>();
         if (!Directory.Exists(directory))
         {
-            return findings;
+            return new SecretScanReport(findings, unscanned);
         }
 
         var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
@@ -55,39 +67,62 @@ public static class SecretScanner
 
         foreach (var file in files)
         {
-            if (new FileInfo(file).Length > MaxFileSize)
-            {
-                continue;
-            }
-
             var relative = Path.GetRelativePath(directory, file).Replace('\\', '/');
-            findings.AddRange(Scan(relative, File.ReadAllText(file)));
+            try
+            {
+                ScanLines(relative, File.ReadLines(file), findings, out var skippedLine);
+                if (skippedLine is not null)
+                {
+                    unscanned.Add(new UnscannedFile(relative, $"line {skippedLine} is too long or too complex to scan"));
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                unscanned.Add(new UnscannedFile(relative, $"the file could not be read ({ex.Message})"));
+            }
         }
 
-        return findings;
+        return new SecretScanReport(findings, unscanned);
     }
 
+    // Lines the patterns cannot handle in time are not reported here; ScanDirectoryReport lists them.
     public static IReadOnlyList<SecretFinding> Scan(string fileName, string content)
     {
         var findings = new List<SecretFinding>();
         var lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        ScanLines(fileName, lines, findings, out _);
+        return findings;
+    }
 
-        for (var i = 0; i < lines.Length; i++)
+    private static void ScanLines(string fileName, IEnumerable<string> lines, List<SecretFinding> findings, out int? firstSkippedLine)
+    {
+        firstSkippedLine = null;
+        var number = 0;
+
+        foreach (var line in lines)
         {
-            var line = lines[i];
+            number++;
             if (line.Contains(AllowMarker, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var kind = DetectKind(line);
+            string? kind;
+            try
+            {
+                kind = DetectKind(line);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                firstSkippedLine ??= number;
+                continue;
+            }
+
             if (kind is not null)
             {
-                findings.Add(new SecretFinding(fileName, i + 1, kind));
+                findings.Add(new SecretFinding(fileName, number, kind));
             }
         }
-
-        return findings;
     }
 
     private static string? DetectKind(string line)
