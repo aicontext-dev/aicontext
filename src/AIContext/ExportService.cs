@@ -36,6 +36,9 @@ public sealed record StatusReport(
     IReadOnlyList<Diagnostic> Diagnostics)
 {
     public bool HasErrors => Diagnostics.Any(d => d.IsError);
+
+    // Tools that load several of the selected targets' files together (an estimate, see ToolOverlaps).
+    public IReadOnlyList<ToolOverlap> Overlaps => ToolOverlaps.Compute(Targets);
 }
 
 // The safe way to export: load and validate the project, plan every file of every target, report conflicts and

@@ -251,8 +251,15 @@ public sealed class CliAppTests : IDisposable
     [Fact]
     public void InitValidateExportCheck_ExtendedProject_FollowsExitCodeContract()
     {
-        Assert.Equal(0, Run("init", "--name", "demo", "--profile", "extended").ExitCode);
+        var init = Run("init", "--name", "demo", "--profile", "extended");
+        Assert.Equal(0, init.ExitCode);
+        Assert.Contains("replace the TODO placeholders", init.Output);
+
+        Assert.Equal(0, Run("validate").ExitCode);
+        Assert.Equal(1, Run("validate", "--strict").ExitCode);
+        FillInPlaceholders();
         Assert.Equal(0, Run("validate", "--strict").ExitCode);
+
         Assert.Equal(1, Run("export", "--target", "all", "--check").ExitCode);
         Assert.Equal(0, Run("export", "--target", "all").ExitCode);
         Assert.Equal(0, Run("export", "--target", "all", "--check").ExitCode);
@@ -262,6 +269,49 @@ public sealed class CliAppTests : IDisposable
 
         Assert.Equal(1, stale.ExitCode);
         Assert.Contains("out of date", stale.Error);
+    }
+
+    private void FillInPlaceholders()
+    {
+        var directory = PathOf(".aicontext");
+        File.WriteAllText(Path.Combine(directory, "README.md"), "# Project: demo\n\nA billing service.\n\n**Tech stack:** .NET 10\n");
+        File.WriteAllText(Path.Combine(directory, "architecture.md"), "Two layers: API and domain.");
+        File.WriteAllText(Path.Combine(directory, "decisions.md"), "### D1. Use PostgreSQL\n**Decision:** PostgreSQL.");
+        File.WriteAllText(Path.Combine(directory, "constraints.md"), "- Never log customer data.");
+    }
+
+    [Fact]
+    public void Validate_PlaceholdersFromInit_AreWarningsThatFailOnlyUnderStrict()
+    {
+        Assert.Equal(0, Run("init", "--name", "demo", "--profile", "extended").ExitCode);
+
+        var plain = Run("validate");
+        var strict = Run("validate", "--strict");
+
+        Assert.Equal(0, plain.ExitCode);
+        Assert.Contains("WARNING: Placeholder text in .aicontext/constraints.md:3", plain.Output);
+        Assert.Equal(1, strict.ExitCode);
+        Assert.Contains("treated as errors", strict.Error);
+    }
+
+    [Fact]
+    public void Validate_Success_SaysThatContentIsNotEvaluated()
+    {
+        InitProject();
+
+        var result = Run("validate");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("not whether the content is useful or up to date", result.Output);
+    }
+
+    [Fact]
+    public void Validate_FailedRun_DoesNotPrintTheSuccessNote()
+    {
+        InitProject();
+        File.Delete(PathOf(Path.Combine(".aicontext", "context.json")));
+
+        Assert.DoesNotContain("not whether the content", Run("validate").Output);
     }
 
     [Fact]
@@ -455,5 +505,28 @@ public sealed class CliAppTests : IDisposable
 
         Assert.Equal(1, result.ExitCode);
         Assert.Contains("ERROR: Unsupported layout 'wide'", result.Error);
+    }
+
+    [Fact]
+    public void Status_TargetsThatAreReadTogether_PrintsTheOverlap()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "targets": ["agents", "copilot"] } }""");
+
+        var result = Run("status");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Overlap:", result.Output);
+        Assert.Contains("Copilot (VS Code)", result.Output);
+        Assert.Contains("copilot + agents", result.Output);
+    }
+
+    [Fact]
+    public void Status_SingleTarget_PrintsNoOverlap()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "targets": ["agents"] } }""");
+
+        Assert.DoesNotContain("Overlap:", Run("status").Output);
     }
 }

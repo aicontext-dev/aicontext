@@ -79,6 +79,15 @@ public static class ContextValidator
                               !diagnostics.Any(d => d.IsError) &&
                               contextValid;
 
+        foreach (var finding in PlaceholderScanner.ScanDirectory(contextDirectory))
+        {
+            diagnostics.Add(Diagnostic.Warning(
+                DiagnosticCodes.PlaceholderContent,
+                $"Placeholder text in .aicontext/{finding.File}:{finding.Line}. " +
+                $"Replace it with real content, or add '{PlaceholderScanner.AllowMarker}' to the line if it is intentional.",
+                $"{ContextDirectoryName}/{finding.File}:{finding.Line}"));
+        }
+
         var secretScan = SecretScanner.ScanDirectoryReport(contextDirectory);
         foreach (var finding in secretScan.Findings)
         {

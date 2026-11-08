@@ -37,6 +37,7 @@ public static class DiagnosticCodes
     public const string NestedAgentsWithoutSplit = "AIC1104";
     public const string RecommendedFileMissing = "AIC1105";
     public const string RecommendedFileEmpty = "AIC1106";
+    public const string PlaceholderContent = "AIC1107";
 
     public const string InvalidRuleName = "AIC2001";
     public const string ReservedRuleName = "AIC2002";

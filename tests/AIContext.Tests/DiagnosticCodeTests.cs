@@ -223,6 +223,18 @@ public sealed class DiagnosticCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_PlaceholderText_ReportsAIC1107WithFileAndLine()
+    {
+        WriteFile("constraints.md", "Hard rules.\n\n- TODO: a rule that must never be violated.\n");
+        WriteRule("ui.md", "---\ndescription: UI\n---\nTODO: write the rule\n");
+
+        var diagnostics = Validate().Where(d => d.Code == DiagnosticCodes.PlaceholderContent).ToList();
+
+        Assert.Equal([".aicontext/constraints.md:3", ".aicontext/rules/ui.md:4"], diagnostics.Select(d => d.Location));
+        Assert.All(diagnostics, d => Assert.False(d.IsError));
+    }
+
+    [Fact]
     public void Validate_UnreadableFile_ReportsAIC3002()
     {
         WriteFile("glossary.md", "Terms.");

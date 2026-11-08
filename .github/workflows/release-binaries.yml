@@ -78,10 +78,15 @@ jobs:
           "$bin" export --path "$work" --target all --check
           "$bin" validate --strict
 
-          # Extended profile must pass strict validation.
+          # A fresh extended project is structurally complete, so plain validation passes, but strict
+          # validation reports its TODO placeholders until they are replaced.
           ext="$(mktemp -d)"
           "$bin" init --path "$ext" --name smoke-ext --profile extended
-          "$bin" validate --path "$ext" --strict
+          "$bin" validate --path "$ext"
+          if "$bin" validate --path "$ext" --strict; then
+            echo "strict validation accepted the TODO placeholders of a fresh extended project"
+            exit 1
+          fi
 
           # Schema validation must still reject invalid input in the trimmed binary.
           bad="$(mktemp -d)"
