@@ -6,6 +6,17 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+### Added
+
+- **`aicontext status` shows overlap between exported files.** Some tools read several of the exported files and load them together (Copilot in VS Code combines `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`), so the per-target table understated the real always-on context. `status` now adds an "Overlap" section with the summed always-on size for such tools (Copilot, Cursor, Devin), built from a small table taken from the vendors' documentation and labelled as an estimate. It is informational only, not a `validate` warning. Library: `ToolOverlaps`, `ToolOverlap`, `StatusReport.Overlaps`.
+- **`validate` reports obvious placeholder text** (`TODO: ...`, a value that is only `TODO` such as `**Tech stack:** TODO`, the starter summary line of `init`) in `README.md`, the section files and `rules/*.md` as the warning `AIC1107`. Code blocks and inline code are ignored, and a line can opt out with `aicontext:allow-placeholder`. Library: `PlaceholderScanner`, `DiagnosticCodes.PlaceholderContent`.
+- `aicontext init` prints a hint to replace the `TODO` placeholders, and a successful `validate` states that it checks structure and obvious placeholders, not whether the content is useful or up to date.
+
+### Changed
+
+- **`validate --strict` now fails for a project that still contains starter placeholders.** A freshly initialized extended project used to pass `validate --strict` as the Extended profile although its files said `TODO`, and `export` sent those stubs to AI tools as real context. The profiles stay structural, a plain `validate` still passes (exit 0), and only `--strict` turns the warning into an error. The standalone-binary smoke test now expects exactly this.
+- SPEC 7 and 8.2 state that placeholder detection is an optional heuristic and that the profiles describe structure only. No change to the format or to `specVersion`.
+
 ## [0.5.0] - 2026-11-08
 
 This release hardens the CLI and the export. It fixes problems that could delete or write files outside the intended place, and problems that let a broken or mistyped invocation pass silently in CI. Some of these fixes change behavior that scripts may have relied on: see **Changed** first.

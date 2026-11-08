@@ -144,6 +144,7 @@ public sealed class CliApp
             _out.WriteLine($"Created: {created}");
         }
 
+        _out.WriteLine("Next: replace the TODO placeholders in .aicontext/ with real content; 'aicontext validate' reports them until you do.");
         return 0;
     }
 
@@ -178,6 +179,7 @@ public sealed class CliApp
 
         var profile = validationResult.ExtendedProfile ? "Extended" : "Core";
         _out.WriteLine($"AIContext validation passed ({profile} profile).");
+        _out.WriteLine("Validation checks structure and obvious placeholders, not whether the content is useful or up to date.");
         return 0;
     }
 
@@ -311,6 +313,20 @@ public sealed class CliApp
         _out.WriteLine();
         _out.WriteLine("Always on = loaded in every request. Scoped / on-demand = loaded only for matching files or when relevant.");
         _out.WriteLine($"Token counts are estimates (~{ExportStatus.CharsPerToken} characters per token).");
+
+        var overlaps = report.Overlaps;
+        if (overlaps.Count > 0)
+        {
+            _out.WriteLine();
+            _out.WriteLine("Overlap: these tools read several of the exported files and load them together");
+            _out.WriteLine("(from the vendors' documentation; what a tool really loads depends on its version and settings):");
+            foreach (var overlap in overlaps)
+            {
+                _out.WriteLine($"  {overlap.Tool,-18} {string.Join(" + ", overlap.Targets),-27} {FormatSize(overlap.AlwaysOnChars)} always on");
+            }
+
+            _out.WriteLine("Tip: export only the targets of the tools you use, or leave out 'agents' when every tool you use has its own format.");
+        }
 
         if (report.NestedAgentsPlan is { } plan)
         {

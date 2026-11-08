@@ -59,11 +59,29 @@ public sealed class ProjectInitializerTests : IDisposable
     }
 
     [Fact]
-    public void Initialize_ExtendedProfile_PassesStrictValidationAsExtendedProfile()
+    public void Initialize_ExtendedProfile_IsExtendedProfileWithOnlyPlaceholderWarnings()
     {
         var result = Init(InitProfile.Extended);
 
         Assert.Equal(5, result.Created.Count);
+        var validation = ContextValidator.ValidateDirectory(_basePath, SchemaUrl);
+
+        Assert.Empty(validation.Errors);
+        Assert.True(validation.ExtendedProfile);
+        Assert.NotEmpty(validation.Diagnostics);
+        Assert.All(validation.Diagnostics, d => Assert.Equal(DiagnosticCodes.PlaceholderContent, d.Code));
+    }
+
+    [Fact]
+    public void Initialize_ExtendedProfile_PassesStrictValidationOnceThePlaceholdersAreReplaced()
+    {
+        Init(InitProfile.Extended);
+        var contextDirectory = Path.Combine(_basePath, ".aicontext");
+        File.WriteAllText(Path.Combine(contextDirectory, "README.md"), "# Project: demo\n\nA billing service.\n\n**Tech stack:** .NET 10\n");
+        File.WriteAllText(Path.Combine(contextDirectory, "architecture.md"), "Two layers: API and domain.");
+        File.WriteAllText(Path.Combine(contextDirectory, "decisions.md"), "### D1. Use PostgreSQL\n**Decision:** PostgreSQL.");
+        File.WriteAllText(Path.Combine(contextDirectory, "constraints.md"), "- Never log customer data.");
+
         var validation = ContextValidator.ValidateDirectory(_basePath, SchemaUrl);
 
         Assert.Empty(validation.Errors);

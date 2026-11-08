@@ -297,4 +297,22 @@ public sealed class ExportServiceTests : IDisposable
 
         Assert.Single(report.Diagnostics, d => d.IsError && d.Code == DiagnosticCodes.UnsupportedLayout);
     }
+
+    [Fact]
+    public void Status_TargetsThatAreReadTogether_ReportTheOverlap()
+    {
+        WriteContext("""{ "targets": ["agents", "copilot"] }""");
+
+        var overlap = Assert.Single(ExportService.Status(_project).Overlaps);
+
+        Assert.Equal(["copilot", "agents"], overlap.Targets);
+    }
+
+    [Fact]
+    public void Status_SingleTarget_ReportsNoOverlap()
+    {
+        WriteContext("""{ "targets": ["agents"] }""");
+
+        Assert.Empty(ExportService.Status(_project).Overlaps);
+    }
 }
