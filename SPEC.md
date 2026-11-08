@@ -284,6 +284,8 @@ While the specification is a draft (`0.x`), additions may be made within the cur
 
 Implementations SHOULD provide lint checks for common secret patterns in context files. Such findings SHOULD be reported as warnings (and MAY be promoted to errors by an explicit strict mode), SHOULD NOT print the matched secret value, and SHOULD offer a way to mark intentional examples.
 
+Such a lint is a heuristic aid: it does not find every secret and is no guarantee that none is present, and it does not replace dedicated secret-scanning tools. Implementations SHOULD document which files they scan, and SHOULD report a file they could not scan completely (for example an unreadable file) instead of skipping it silently.
+
 ## 11. Governance (project-level)
 
 Specification changes SHOULD use an RFC-like process:

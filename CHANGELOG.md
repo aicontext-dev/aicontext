@@ -18,9 +18,11 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 - `aicontext <command> --help` (also `-h`) prints the usage and options of a single command.
 - CLI tests for argument validation, exit codes and the `init` / `validate` / `export --check` workflow. The test job in `pr-checks.yml` now runs on Ubuntu and Windows.
 - `ExportFileStatus.Blocked` and `SyncState.Blocked` (with `ExportFilePlan.Reason`), and `ContextSchema.CanonicalUrl`, in the core library. `aicontext status` shows `blocked` for a target whose files would leave the project through a link.
+- `SecretScanner.ScanDirectoryReport` (with `SecretScanReport` and `UnscannedFile`) returns the findings together with the files it could not scan; `ScanDirectory` still returns only the findings. `validate` warns `Secret scan incomplete for .aicontext/<file>: <reason>. Check it manually.` for such files, so `--strict` no longer passes a scan that was incomplete.
 
 ### Fixed
 
+- **`validate` no longer skips large files when scanning for secrets.** The scanner silently ignored every file above 512 KiB, so the same secret failed `validate --strict` in a small file and passed in a larger one (reproduced). Files are now read line by line without a size limit; a file that cannot be read, or a line that is too long or complex to check in time, is reported instead of being skipped (or crashing the scan). Files with other extensions than `.md`, `.mdc`, `.json`, `.yml`, `.yaml` and `.txt` are still not scanned, which SPEC 10, the README and the user manual now state together with the fact that the scan is a heuristic and no guarantee.
 - **Exporting a project no longer deletes the generated `AGENTS.md` of an independent project in a subdirectory.** The cleanup of orphaned nested `AGENTS.md` files walked the whole tree, so a parent export removed a nested project's own file (even without `nestedAgents`) and `export --check` in that project then failed. A directory that has its own `.aicontext/` is now a project boundary: the cleanup skips it, and `nestedAgents` keeps a rule scoped to it (or below it) in the root file, with the reason shown by `status`. Orphan cleanup elsewhere is unchanged.
 
 ### Security
