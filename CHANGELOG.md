@@ -10,11 +10,22 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 - **The CLI rejects invalid arguments before running a command** (exit code 1, nothing is validated, exported or written). Previously unknown options were ignored, so `validate --strcit` passed without `--strict`, `export --chek` wrote files instead of checking them, and `init --path --force` (value missing) ran in the current directory and overwrote existing files. Now an unknown option, an option that belongs to another command, an option without its value, a repeated option and a non-boolean value after a flag (`--strict no`) are errors. Flags still accept an explicit `true`/`false`/`1`/`0`. Scripts that relied on the old lenient behavior must be corrected.
 - The CLI logic moved from top-level statements to `AIContext.Cli.CliApp` (`CliApp.Run(args, output, error, workingDirectory)`) so it can be tested in-process. Output and exit codes of valid commands are unchanged; the overview from `--help` lists the commands in usage order.
+- **`export` and `status` refuse what `validate` reports as an error.** Previously `export` only checked that the files exist and parse, so an unsupported `specVersion` (for example `999.0.0`), a wrong type, an unknown property or a `context.json` that was not an object still produced files while `validate` failed. Now `ContextLoader.Load` applies the same checks as `ValidateDirectory` and returns its errors; warnings (missing recommended files, possible secrets, ...) never block export or status. `export` prints every such error with the `ERROR:` prefix followed by `No files were written.`
+- SPEC 6.3, 6.4 and 7 state the new requirements (no writes outside the project, separate projects, export applies validation errors). No change to the format or to `specVersion`.
 
 ### Added
 
 - `aicontext <command> --help` (also `-h`) prints the usage and options of a single command.
 - CLI tests for argument validation, exit codes and the `init` / `validate` / `export --check` workflow. The test job in `pr-checks.yml` now runs on Ubuntu and Windows.
+- `ExportFileStatus.Blocked` and `SyncState.Blocked` (with `ExportFilePlan.Reason`), and `ContextSchema.CanonicalUrl`, in the core library. `aicontext status` shows `blocked` for a target whose files would leave the project through a link.
+
+### Fixed
+
+- **Exporting a project no longer deletes the generated `AGENTS.md` of an independent project in a subdirectory.** The cleanup of orphaned nested `AGENTS.md` files walked the whole tree, so a parent export removed a nested project's own file (even without `nestedAgents`) and `export --check` in that project then failed. A directory that has its own `.aicontext/` is now a project boundary: the cleanup skips it, and `nestedAgents` keeps a rule scoped to it (or below it) in the root file, with the reason shown by `status`. Orphan cleanup elsewhere is unchanged.
+
+### Security
+
+- **Export never writes or deletes outside the project through a symlink or junction.** The check that a nested directory lies inside the repository compared path text only, so a link inside the repository could send a generated `AGENTS.md` anywhere (reproduced with a Windows junction); the same applied to fixed output paths such as `.github/` and to removing orphaned rule files. Every path to be written or deleted is now resolved (links followed, also dangling file links) and must stay inside the real project root; links that stay inside are allowed, and a project reached through a link works. A violation is reported as `Blocked`; as with an overwrite conflict, nothing is written and the command fails (also with `--dry-run` and `--check`). Verified on Windows (junctions) and Linux (symlinks).
 
 ## [0.4.0] - 2026-11-04
 

@@ -6,6 +6,8 @@ namespace AIContext.Tests;
 public sealed class CliAppTests : IDisposable
 {
     private readonly string _basePath = Path.Combine(Path.GetTempPath(), "aicontext-tests-" + Guid.NewGuid().ToString("N"));
+    private readonly string _outsidePath = Path.Combine(Path.GetTempPath(), "aicontext-tests-outside-" + Guid.NewGuid().ToString("N"));
+    private readonly List<string> _links = [];
 
     public CliAppTests()
     {
@@ -14,7 +16,16 @@ public sealed class CliAppTests : IDisposable
 
     public void Dispose()
     {
+        foreach (var link in Enumerable.Reverse(_links))
+        {
+            TestLinks.Remove(link);
+        }
+
         Directory.Delete(_basePath, recursive: true);
+        if (Directory.Exists(_outsidePath))
+        {
+            Directory.Delete(_outsidePath, recursive: true);
+        }
     }
 
     private sealed record CliResult(int ExitCode, string Output, string Error);
@@ -264,5 +275,126 @@ public sealed class CliAppTests : IDisposable
         Assert.Equal(1, result.ExitCode);
         Assert.Contains("No files were written", result.Error);
         Assert.Equal("hand written", File.ReadAllText(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_ParentOfIndependentProject_LeavesTheChildExportInSync()
+    {
+        InitProject();
+        var child = PathOf(Path.Combine("pkg", "child"));
+        Assert.Equal(0, Run("init", "--path", child, "--name", "child").ExitCode);
+        Assert.Equal(0, Run("export", "--target", "agents", "--path", child).ExitCode);
+
+        var parent = Run("export", "--target", "agents");
+
+        Assert.Equal(0, parent.ExitCode);
+        Assert.DoesNotContain("Removed", parent.Output);
+        Assert.True(File.Exists(Path.Combine(child, "AGENTS.md")));
+        Assert.Equal(0, Run("export", "--target", "agents", "--path", child, "--check").ExitCode);
+    }
+
+    private void WriteContext(string json) =>
+        File.WriteAllText(PathOf(Path.Combine(".aicontext", "context.json")), json);
+
+    private void SetUpNestedRuleBehindLink()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "layout": "split", "nestedAgents": true } }""");
+        Directory.CreateDirectory(PathOf(Path.Combine(".aicontext", "rules")));
+        File.WriteAllText(
+            PathOf(Path.Combine(".aicontext", "rules", "linked.md")),
+            "---\ndescription: Linked\npaths: [\"linked/**\"]\n---\nBody.\n");
+
+        Directory.CreateDirectory(_outsidePath);
+        var link = PathOf("linked");
+        TestLinks.CreateDirectoryLink(link, _outsidePath);
+        _links.Add(link);
+    }
+
+    [Fact]
+    public void Export_NestedDirectoryLinkedOutsideProject_FailsAndWritesNothing()
+    {
+        SetUpNestedRuleBehindLink();
+
+        var result = Run("export", "--target", "agents");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("outside the project", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.Empty(Directory.GetFileSystemEntries(_outsidePath));
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_DryRunWithLinkOutsideProject_StillFails()
+    {
+        SetUpNestedRuleBehindLink();
+
+        var result = Run("export", "--target", "agents", "--dry-run");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Blocked (agents)", result.Output);
+    }
+
+    [Fact]
+    public void Status_NestedDirectoryLinkedOutsideProject_ReportsBlocked()
+    {
+        SetUpNestedRuleBehindLink();
+
+        var result = Run("status");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("blocked", result.Output);
+    }
+
+    [Fact]
+    public void Export_UnsupportedSpecVersion_FailsAndWritesNothing()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "999.0.0", "project": { "name": "demo" } }""");
+
+        var result = Run("export", "--target", "agents");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("ERROR: context.json /specVersion:", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_ContextThatViolatesTheSchema_FailsAndWritesNothing()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "bogus": true }""");
+
+        var result = Run("export", "--target", "all");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("/bogus", result.Error);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Status_InvalidContext_Fails()
+    {
+        InitProject();
+        WriteContext("[1, 2, 3]");
+
+        var result = Run("status");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("ERROR: context.json", result.Error);
+    }
+
+    [Fact]
+    public void Export_ProjectWithOnlyWarnings_Succeeds()
+    {
+        InitProject();
+        Assert.Equal(1, Run("validate", "--strict").ExitCode);
+
+        var result = Run("export", "--target", "agents");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(File.Exists(PathOf("AGENTS.md")));
     }
 }

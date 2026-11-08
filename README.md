@@ -113,6 +113,7 @@ Note:
 - `export` output is deterministic (LF line endings, no timestamp; a `Source-hash` in the header identifies the sources), so unchanged sources never produce a diff. Unchanged files are not rewritten.
 - `--dry-run` shows what would change; `--check` does the same and exits with code 1 when exports are missing or out of date (useful in CI).
 - Invalid arguments never run a command: unknown options (for example a mistyped `--strcit`), missing option values and repeated options are rejected with exit code 1. `aicontext <command> --help` prints the usage of one command.
+- `export` and `status` refuse a project that `validate` reports errors for (for example an unsupported `specVersion`); warnings never block them. Export never writes or deletes outside the project (symlinks and junctions are resolved), and never touches a nested directory that has its own `.aicontext/`.
 
 Current commands:
 

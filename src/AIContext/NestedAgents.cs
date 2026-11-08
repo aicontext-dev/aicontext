@@ -115,6 +115,13 @@ public static class NestedAgentsPlanner
             return null;
         }
 
+        var nestedProject = ProjectBoundary.FindNestedProject(basePath, directory);
+        if (nestedProject is not null)
+        {
+            reason = $"'{directory}' belongs to a separate AIContext project ('{nestedProject}' has its own .aicontext/)";
+            return null;
+        }
+
         return directory;
     }
 }
