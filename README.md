@@ -17,7 +17,7 @@ Works with: GitHub Copilot · Cursor · Claude Code · Windsurf · Devin · Aide
 
 First public draft is available in [SPEC.md](./SPEC.md).
 
-Versions: the specification (currently `0.1.0-draft`, the value of `specVersion` in `context.json`) and the tools (CLI and NuGet packages, currently `0.4.0`) are versioned independently. See [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version).
+Versions: the specification (currently `0.1.0-draft`, the value of `specVersion` in `context.json`) and the tools (CLI and NuGet packages, currently `0.5.0`) are versioned independently. See [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version).
 
 Schema: [schema/v1/context.schema.json](./schema/v1/context.schema.json)  
 Governance: [GOVERNANCE.md](./GOVERNANCE.md)  
