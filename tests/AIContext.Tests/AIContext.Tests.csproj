@@ -12,5 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\AIContext\AIContext.csproj" />
+    <ProjectReference Include="..\..\src\AIContext.CLI\AIContext.CLI.csproj" />
   </ItemGroup>
 </Project>

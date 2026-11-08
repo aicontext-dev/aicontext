@@ -40,8 +40,13 @@ jobs:
           dotnet build src/AIContext.Spec/AIContext.Spec.csproj -c Release
 
   test-dotnet-projects:
-    runs-on: ubuntu-latest
+    name: test-dotnet-projects (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: build-dotnet-projects
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
