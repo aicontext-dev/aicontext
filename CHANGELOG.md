@@ -6,6 +6,10 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-08
+
+This release hardens the CLI and the export. It fixes problems that could delete or write files outside the intended place, and problems that let a broken or mistyped invocation pass silently in CI. Some of these fixes change behavior that scripts may have relied on: see **Changed** first.
+
 ### Changed
 
 - **The CLI rejects invalid arguments before running a command** (exit code 1, nothing is validated, exported or written). Previously unknown options were ignored, so `validate --strcit` passed without `--strict`, `export --chek` wrote files instead of checking them, and `init --path --force` (value missing) ran in the current directory and overwrote existing files. Now an unknown option, an option that belongs to another command, an option without its value, a repeated option and a non-boolean value after a flag (`--strict no`) are errors. Flags still accept an explicit `true`/`false`/`1`/`0`. Scripts that relied on the old lenient behavior must be corrected.
