@@ -73,11 +73,17 @@ public static class ContextValidator
                               errors.Count == 0 &&
                               contextValid;
 
-        foreach (var finding in SecretScanner.ScanDirectory(contextDirectory))
+        var secretScan = SecretScanner.ScanDirectoryReport(contextDirectory);
+        foreach (var finding in secretScan.Findings)
         {
             warnings.Add(
                 $"Possible secret ({finding.Kind}) in .aicontext/{finding.File}:{finding.Line}. " +
                 $"Remove it, or add '{SecretScanner.AllowMarker}' to the line if it is an intentional example.");
+        }
+
+        foreach (var file in secretScan.Unscanned)
+        {
+            warnings.Add($"Secret scan incomplete for .aicontext/{file.File}: {file.Reason}. Check it manually.");
         }
 
         return new ContextValidationResult(errors, warnings, extendedProfile);

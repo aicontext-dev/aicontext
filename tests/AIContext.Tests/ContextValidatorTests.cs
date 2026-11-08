@@ -240,6 +240,27 @@ public sealed class ContextValidatorTests : IDisposable
     }
 
     [Fact]
+    public void ValidateDirectory_SecretInLargeFile_Warns()
+    {
+        WriteMinimalContext();
+        WriteFile("glossary.md", string.Concat(Enumerable.Repeat("filler line\n", 50_000)) + "password = hunter2\n");
+
+        Assert.Contains(Validate().Warnings, w => w.Contains(".aicontext/glossary.md:50001", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ValidateDirectory_FileThatCannotBeRead_WarnsThatTheScanIsIncomplete()
+    {
+        WriteMinimalContext();
+        WriteFile("glossary.md", "Terms.");
+
+        using var locked = new FileStream(Path.Combine(_root, ".aicontext", "glossary.md"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var warnings = Validate().Warnings;
+
+        Assert.Contains(warnings, w => w.StartsWith("Secret scan incomplete for .aicontext/glossary.md:", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ValidateDirectory_WithNestedAgentsWithoutSplit_Warns()
     {
         WriteContext(new

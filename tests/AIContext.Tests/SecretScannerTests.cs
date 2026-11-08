@@ -63,4 +63,86 @@ public class SecretScannerTests
             Directory.Delete(root, true);
         }
     }
+
+    [Fact]
+    public void ScanDirectoryReport_FileLargerThanFormerLimit_IsScannedWithCorrectLineNumber()
+    {
+        using var directory = new TempDirectory();
+        var content = string.Concat(Enumerable.Repeat("filler line\n", 60_000)) + "password = hunter2\n";
+        File.WriteAllText(Path.Combine(directory.Path, "big.md"), content);
+        Assert.True(new FileInfo(Path.Combine(directory.Path, "big.md")).Length > 512 * 1024);
+
+        var report = SecretScanner.ScanDirectoryReport(directory.Path);
+
+        var finding = Assert.Single(report.Findings);
+        Assert.Equal("big.md", finding.File);
+        Assert.Equal(60_001, finding.Line);
+        Assert.Empty(report.Unscanned);
+    }
+
+    [Fact]
+    public void ScanDirectoryReport_VeryLongSingleLine_IsScanned()
+    {
+        using var directory = new TempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "wide.json"), new string('a', 1_000_000) + " password = hunter2");
+
+        var report = SecretScanner.ScanDirectoryReport(directory.Path);
+
+        Assert.Equal(1, Assert.Single(report.Findings).Line);
+        Assert.Empty(report.Unscanned);
+    }
+
+    [Fact]
+    public void ScanDirectoryReport_UnreadableFile_IsReportedInsteadOfSkipped()
+    {
+        using var directory = new TempDirectory();
+        var path = Path.Combine(directory.Path, "locked.md");
+        File.WriteAllText(path, "password = hunter2");
+        File.WriteAllText(Path.Combine(directory.Path, "ok.md"), "password = hunter3");
+
+        using var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        var report = SecretScanner.ScanDirectoryReport(directory.Path);
+
+        var unscanned = Assert.Single(report.Unscanned);
+        Assert.Equal("locked.md", unscanned.File);
+        Assert.Contains("could not be read", unscanned.Reason);
+        Assert.Equal("ok.md", Assert.Single(report.Findings).File);
+    }
+
+    [Fact]
+    public void ScanDirectoryReport_FilesWithOtherExtensions_AreNotScannedAndNotReported()
+    {
+        using var directory = new TempDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "image.png"), "password = hunter2");
+        File.WriteAllText(Path.Combine(directory.Path, "prod.env"), "password = hunter2");
+
+        var report = SecretScanner.ScanDirectoryReport(directory.Path);
+
+        Assert.Empty(report.Findings);
+        Assert.Empty(report.Unscanned);
+    }
+
+    [Fact]
+    public void ScanDirectoryReport_MissingDirectory_ReturnsEmptyReport()
+    {
+        var report = SecretScanner.ScanDirectoryReport(Path.Combine(Path.GetTempPath(), $"aicontext-tests-{Guid.NewGuid():N}"));
+
+        Assert.Empty(report.Findings);
+        Assert.Empty(report.Unscanned);
+    }
+
+    private sealed class TempDirectory : IDisposable
+    {
+        public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"aicontext-tests-{Guid.NewGuid():N}");
+
+        public TempDirectory()
+        {
+            Directory.CreateDirectory(Path);
+        }
+
+        public void Dispose()
+        {
+            Directory.Delete(Path, true);
+        }
+    }
 }
