@@ -6,6 +6,16 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+### Changed
+
+- **The CLI rejects invalid arguments before running a command** (exit code 1, nothing is validated, exported or written). Previously unknown options were ignored, so `validate --strcit` passed without `--strict`, `export --chek` wrote files instead of checking them, and `init --path --force` (value missing) ran in the current directory and overwrote existing files. Now an unknown option, an option that belongs to another command, an option without its value, a repeated option and a non-boolean value after a flag (`--strict no`) are errors. Flags still accept an explicit `true`/`false`/`1`/`0`. Scripts that relied on the old lenient behavior must be corrected.
+- The CLI logic moved from top-level statements to `AIContext.Cli.CliApp` (`CliApp.Run(args, output, error, workingDirectory)`) so it can be tested in-process. Output and exit codes of valid commands are unchanged; the overview from `--help` lists the commands in usage order.
+
+### Added
+
+- `aicontext <command> --help` (also `-h`) prints the usage and options of a single command.
+- CLI tests for argument validation, exit codes and the `init` / `validate` / `export --check` workflow. The test job in `pr-checks.yml` now runs on Ubuntu and Windows.
+
 ## [0.4.0] - 2026-11-04
 
 ### Changed
