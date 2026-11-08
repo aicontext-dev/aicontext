@@ -7,6 +7,8 @@ public sealed record SchemaIssue(string Location, string Message);
 
 public static class ContextSchema
 {
+    public const string CanonicalUrl = "https://aicontext.dev/schema/v1/context.schema.json";
+
     private const string ResourceName = "context.schema.json";
 
     private static readonly Lazy<JsonSchema> Schema = new(Load);

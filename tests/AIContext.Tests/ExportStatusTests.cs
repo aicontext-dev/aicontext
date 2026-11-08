@@ -99,12 +99,13 @@ public sealed class ExportStatusTests : IDisposable
     }
 
     [Fact]
-    public void ContextLoader_FallsBackToDirectoryNameWhenProjectNameIsMissing()
+    public void ContextLoader_ContextWithoutRequiredProperties_IsRefused()
     {
         File.WriteAllText(Path.Combine(_basePath, ".aicontext", "context.json"), "{}");
 
-        var loaded = ContextLoader.Load(_basePath).Loaded!;
+        var result = ContextLoader.Load(_basePath);
 
-        Assert.Equal(new DirectoryInfo(_basePath).Name, loaded.Context.ProjectName);
+        Assert.Null(result.Loaded);
+        Assert.Contains(result.Errors, e => e.Contains("specVersion", StringComparison.Ordinal));
     }
 }

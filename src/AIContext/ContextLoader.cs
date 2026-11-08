@@ -15,38 +15,18 @@ public static class ContextLoader
         var readmePath = Path.Combine(contextDirectory, "README.md");
         var contextPath = Path.Combine(contextDirectory, "context.json");
 
-        var errors = new List<string>();
-        if (!File.Exists(readmePath))
+        // Export and status accept exactly what validate accepts: any validation error stops them,
+        // warnings never do (D13).
+        var validation = ContextValidator.ValidateDirectory(basePath, ContextSchema.CanonicalUrl);
+        if (validation.Errors.Count > 0)
         {
-            errors.Add($"Missing required file: {readmePath}");
+            return new ContextLoadResult(null, validation.Errors);
         }
 
-        if (!File.Exists(contextPath))
-        {
-            errors.Add($"Missing required file: {contextPath}");
-        }
-
-        if (errors.Count > 0)
-        {
-            return new ContextLoadResult(null, errors);
-        }
-
-        JsonElement root;
-        try
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(contextPath));
-            root = document.RootElement.Clone();
-        }
-        catch (JsonException ex)
-        {
-            return new ContextLoadResult(null, [$"Invalid JSON in {contextPath}. {ex.Message}"]);
-        }
+        using var document = JsonDocument.Parse(File.ReadAllText(contextPath));
+        var root = document.RootElement.Clone();
 
         var ruleLoad = RuleLoader.Load(contextDirectory);
-        if (ruleLoad.Errors.Count > 0)
-        {
-            return new ContextLoadResult(null, ruleLoad.Errors);
-        }
 
         var projectName = ReadProjectName(root);
         if (string.IsNullOrWhiteSpace(projectName))
