@@ -226,7 +226,7 @@ Validation is divided into three levels:
 2. **Schema** (MUST): `context.json` is valid against declared schema.
 3. **Quality** (SHOULD): recommended files are non-empty and materially useful.
 
-Recommended-file absence is not a hard spec error in v0.1, but MUST be surfaced as warnings. Implementations SHOULD also warn about recommended files that exist but are empty.
+Recommended-file absence is not a hard spec error in v0.1, but MUST be surfaced as warnings. Implementations SHOULD also warn about recommended files that exist but are empty. Implementations MAY report obvious placeholder text in context files (for example `TODO: describe ...` or `**Tech stack:** TODO`) as warnings, so that a project made of starter stubs is not mistaken for useful content. Such a check is a heuristic and cannot tell whether the remaining content is useful or up to date.
 
 Schema validation MUST use the published schema for the declared `specVersion`. Implementations MAY embed a copy of the schema instead of fetching it.
 
@@ -248,6 +248,8 @@ A repository is Extended-compliant if Core profile is met and all recommended fi
 - `architecture.md`
 - `decisions.md`
 - `constraints.md`
+
+The profiles describe structure only. A repository can meet the Extended profile and still contain starter text or outdated content; whether the content is useful is a quality matter (section 7).
 
 ## 9. Compatibility and versioning
 

@@ -148,9 +148,10 @@ WARNING: Recommended file missing: .aicontext/architecture.md.
 WARNING: Recommended file missing: .aicontext/decisions.md.
 WARNING: Recommended file missing: .aicontext/constraints.md.
 AIContext validation passed (Core profile).
+Validation checks structure and obvious placeholders, not whether the content is useful or up to date.
 ```
 
-It passed (Core profile), but the tool recommends adding three files (chapter 3). You do not have to yet.
+It passed (Core profile), but the tool recommends adding three files (chapter 3). You do not have to yet. If you skipped Step 3, `validate` also warns about every remaining placeholder (`Placeholder text in .aicontext/README.md:3 …`).
 
 ### Step 5: Export
 
@@ -242,6 +243,8 @@ Consequence: we do not use T-SQL specifics; migrations are done through EF.
 - **Extended profile:** Core + non-empty `architecture.md`, `decisions.md`, `constraints.md`.
 
 At the end, `aicontext validate` prints which profile you meet. Extended is not required, but it helps AI assistants considerably.
+
+The profiles describe **structure only**. A project made of the starter files from `aicontext init --profile extended` meets the Extended profile, but its files still say `TODO`. `validate` therefore also warns about obvious placeholder text (`TODO: …`, `**Tech stack:** TODO`, the starter summary line); the warning fails `--strict` until you replace it. The tool cannot judge whether the rest of the content is useful or up to date.
 
 ---
 
@@ -341,7 +344,7 @@ aicontext init [--path <directory>] [--name <name>] [--profile core|extended] [-
 aicontext --version
 ```
 
-Creates `.aicontext/README.md` and `.aicontext/context.json` (Core profile, the default). With `--profile extended` it also creates starter `architecture.md`, `decisions.md` and `constraints.md` (replace the `TODO` markers with real content), so `validate` reports the Extended profile. If any of the files already exist, it fails and writes nothing; `--force` overwrites them. `aicontext --version` prints the tool version and the specification version.
+Creates `.aicontext/README.md` and `.aicontext/context.json` (Core profile, the default). With `--profile extended` it also creates starter `architecture.md`, `decisions.md` and `constraints.md` (replace the `TODO` markers with real content; until you do, `validate` reports them as warnings and `validate --strict` fails), so `validate` reports the Extended profile. If any of the files already exist, it fails and writes nothing; `--force` overwrites them. `aicontext --version` prints the tool version and the specification version.
 
 ### `aicontext validate`
 
@@ -355,7 +358,8 @@ Checks `.aicontext/`:
 2. recommended files (a warning if missing or empty),
 3. rules in `rules/`,
 4. accidentally pasted secrets (a warning),
-5. prints the profile (Core/Extended).
+5. obvious placeholder text such as `TODO: …` in the context files (a warning; add `aicontext:allow-placeholder` to a line where it is intentional),
+6. prints the profile (Core/Extended) and reminds you that validation checks structure, not whether the content is useful.
 
 Exit codes: `0` = OK, `1` = error. With `--strict`, warnings count as errors (useful in CI).
 
@@ -418,6 +422,17 @@ windsurf   2.3 KB (~593 tok)     9.0 KB (~2,305 tok)  6      in sync
 - **Tokens** are only an estimate (~4 characters per token).
 - **State**: `in sync` (up to date), `out of date (run export)`, `not exported`, `conflict`, `blocked` (a path leaves the project through a link).
 
+Some tools read more than their own file. When your targets include such a tool together with the other files it reads, `status` adds an **overlap** section with the sum of the always-on content they load together, because the per-target table alone understates it:
+
+```
+Overlap: these tools read several of the exported files and load them together
+  Copilot (VS Code)  copilot + agents + claude   42.8 KB (~10,944 tok) always on
+  Cursor             cursor + agents             17.1 KB (~4,382 tok) always on
+Tip: export only the targets of the tools you use, or leave out 'agents' when every tool you use has its own format.
+```
+
+The list follows the vendors' documentation (Copilot in VS Code combines `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`; Cursor supports `AGENTS.md` next to `.cursor/rules`; Devin reads `AGENTS.md` and both `.devin/rules` and `.windsurf/rules`). What a tool really loads depends on its version and settings, so treat the numbers as an estimate. It is information only: it is not a warning of `validate`.
+
 With the `single` layout it also prints a tip about how much `split` would reduce the always-on context.
 
 ---
@@ -444,7 +459,7 @@ Enable only the tools your team actually uses, in `context.json`:
 "exports": { "targets": ["agents", "copilot", "cursor"] }
 ```
 
-Beware of overlap: several tools read `AGENTS.md` **in addition** to their own files (for example Copilot, Cursor, Devin). If you export `agents` together with their own targets, they may see the same content twice. If that bothers you, keep `agents` only for tools that have no other format.
+Beware of overlap: several tools read `AGENTS.md` **in addition** to their own files (for example Copilot, Cursor, Devin). If you export `agents` together with their own targets, they may see the same content twice. `aicontext status` lists the tools affected and how much always-on content they load together. If that bothers you, keep `agents` only for tools that have no other format.
 
 ### What a generated file looks like
 
@@ -615,7 +630,7 @@ Run `aicontext export` in each project separately (or add one `export --check` p
 | Kind | Examples | Consequence |
 |---|---|---|
 | **Error** | missing `README.md`/`context.json`, invalid JSON, schema violation, invalid rule (bad name, unclosed header) | `validate` exits with code `1`; `export` and `status` also stop and write nothing |
-| **Warning** | missing/empty recommended file, possible secret, unknown key in a rule header, `windsurf` + `devin` together, `nestedAgents` without `split` | with `--strict` also code `1`; never blocks `export` |
+| **Warning** | missing/empty recommended file, placeholder text (`TODO: …`), possible secret, unknown key in a rule header, `windsurf` + `devin` together, `nestedAgents` without `split` | with `--strict` also code `1`; never blocks `export` |
 
 ### Protection against secrets
 
@@ -664,7 +679,7 @@ jobs:
       - run: aicontext export --target all --check
 ```
 
-- `validate --strict` fails on an error or warning (missing file, possible secret).
+- `validate --strict` fails on an error or warning (missing file, placeholder text, possible secret).
 - `export --check` fails if someone changed `.aicontext/` and forgot to run `export`, or edited a generated file by hand.
 - If the `aicontext` command is not found after installation, use `dotnet tool install AIContext.CLI --tool-path ./tools` and call `./tools/aicontext`.
 - Without .NET in CI (for example a JS/Python project) you can download the binary instead of `setup-dotnet` and `dotnet tool install`:
@@ -748,6 +763,7 @@ Delete `.aicontext/`. The generated files (`AGENTS.md`, …) remain as ordinary 
 | `context.json /…: …` | configuration error | the path in the message shows the exact place; compare with chapter 4 |
 | `unknown property is not allowed` | a typo or non-existent field in `context.json` | fix the field name |
 | `Recommended file missing …` | warning | add the file (chapter 3) or ignore; must be added in CI with `--strict` |
+| `Placeholder text in .aicontext/…` | a `TODO` stub (for example from `init`) is still in a context file | replace it with real content; for text that is intentionally `TODO`, add `aicontext:allow-placeholder` to the line |
 | `Possible secret …` | there is a password/key in `.aicontext/` | remove it; for an intentional example add `aicontext:allow-secret` |
 | `Secret scan incomplete for .aicontext/…` | the file could not be read (permissions, locked file) or a line was too long to check | fix the access problem, or check the file manually |
 | `exists and was not generated by aicontext` | the target has a hand-written file | move its content into `.aicontext/`, then `--force` |
@@ -786,6 +802,7 @@ Every error and warning of the library (and so of the CLI) carries a stable code
 | `AIC1104` | warning | `exports.nestedAgents` has no effect without the `split` layout |
 | `AIC1105` | warning | a recommended file is missing |
 | `AIC1106` | warning | a recommended file is empty |
+| `AIC1107` | warning | placeholder text (`TODO: …`, the `init` stubs) is still in a context file; the location holds file and line |
 | `AIC2001` | error | a rule file name uses disallowed characters |
 | `AIC2002` | error | a rule file name is reserved for a built-in section |
 | `AIC2003` | error | a rule header (frontmatter) cannot be read, for example it is not closed |
