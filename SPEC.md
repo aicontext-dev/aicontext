@@ -334,3 +334,5 @@ Planned command surface:
 `status` reports, per export target, how much content is always loaded versus loaded only by scope or relevance, and whether generated files are in sync with `.aicontext/`.
 
 This section is informative only; command behavior is defined by tooling implementation, not by the file format itself.
+
+Independent implementations can check their handling of `context.json` against the language-neutral [conformance suite](./conformance/README.md), which lists valid and invalid documents and where an error is expected.

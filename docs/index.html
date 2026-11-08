@@ -3,30 +3,142 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AIContext</title>
+  <title>AIContext – one source of project context for every AI coding tool</title>
+  <meta name="description" content="AIContext is an open format and CLI for AI coding assistant project context: write it once in .aicontext/, generate AGENTS.md, CLAUDE.md, Copilot, Cursor, Windsurf and Aider files from it.">
   <style>
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 40px auto; max-width: 900px; line-height: 1.6; padding: 0 16px; color: #111; }
     h1 { margin-bottom: 0.2em; }
+    h2 { margin-top: 1.8em; }
     .tagline { color: #555; margin-top: 0; }
+    .status { background: #fff8e1; border-left: 4px solid #f2b705; padding: 8px 12px; margin: 16px 0; }
     ul { padding-left: 20px; }
     code { background: #f2f2f2; padding: 2px 6px; border-radius: 4px; }
+    pre { background: #f6f8fa; padding: 12px 16px; border-radius: 6px; overflow-x: auto; line-height: 1.45; }
+    pre code { background: none; padding: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #f6f8fa; }
+    .cols { display: flex; flex-wrap: wrap; gap: 24px; }
+    .cols > div { flex: 1 1 300px; }
     a { color: #0969da; text-decoration: none; }
     a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <h1>AIContext</h1>
-  <p class="tagline">Open format standard for AI coding assistant project context.</p>
+  <p class="tagline">Open format standard for AI coding assistant project context.<br>One source of truth. Every AI tool.</p>
 
-  <p>
-    One source of truth in <code>.aicontext/</code>, exportable to multiple AI coding tools.
+  <p class="status">
+    The specification is a draft (<code>0.1.0-draft</code>) and the tools are <code>0.x</code>, so formats and behavior can still change.
+    See the <a href="./CHANGELOG.md">changelog</a>.
   </p>
 
-  <h2>Documentation</h2>
+  <h2>The problem</h2>
+  <p>
+    Every AI coding assistant reads its own instruction file: <code>AGENTS.md</code>, <code>CLAUDE.md</code>,
+    <code>.github/copilot-instructions.md</code>, <code>.cursor/rules/</code>, <code>.windsurf/rules/</code>,
+    <code>CONVENTIONS.md</code>. A team that uses more than one tool writes the same project knowledge several times,
+    and the copies drift apart.
+  </p>
+
+  <h2>The result</h2>
+  <p>
+    You write the knowledge once in <code>.aicontext/</code> (plain markdown), and <code>aicontext export</code>
+    generates each tool's file from it. The output is deterministic, so unchanged sources produce no diff, and CI can check that
+    the generated files are up to date.
+  </p>
+  <div class="cols">
+    <div>
+      <strong>Before</strong>: the same text kept by hand
+<pre><code>AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
+.cursor/rules/project.mdc</code></pre>
+    </div>
+    <div>
+      <strong>After</strong>: one source, generated files
+<pre><code>.aicontext/        &lt;- you edit this
+  README.md
+  constraints.md
+  rules/ui.md
+
+AGENTS.md          &lt;- generated
+CLAUDE.md          &lt;- generated
+...                &lt;- generated</code></pre>
+    </div>
+  </div>
+
+  <h2>Try it</h2>
+<pre><code>aicontext init --name my-project       # creates .aicontext/README.md and context.json
+# edit .aicontext/README.md: what the project is, its stack, rules that must never be broken
+aicontext validate                     # schema, recommended files, placeholders, possible secrets
+aicontext export --target all          # writes AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, ...
+aicontext export --target all --check  # in CI: exit code 1 when the generated files are out of date</code></pre>
+<pre><code>Created (agents): AGENTS.md
+Created (copilot): .github\copilot-instructions.md
+Created (claude): CLAUDE.md
+Created (cursor): .cursor\rules\project.mdc
+Created (windsurf): .windsurf\rules\project.md
+Created (aider): CONVENTIONS.md
+Export completed (6 changed, 0 unchanged).</code></pre>
+
+  <h2>Is it for you?</h2>
+  <div class="cols">
+    <div>
+      <strong>A good fit</strong>
+      <ul>
+        <li>You or your team use two or more AI coding tools, or expect to.</li>
+        <li>You want project guidance reviewed in pull requests like code.</li>
+        <li>A large repository or monorepo, where scoped rules keep the always-on context small.</li>
+        <li>CI should catch drift, stray secrets and an unfinished context.</li>
+      </ul>
+    </div>
+    <div>
+      <strong>Probably not (yet)</strong>
+      <ul>
+        <li>You use a single tool and a short hand-written file already works: keep it.</li>
+        <li>You expect AIContext to write or judge the content: a passing <code>validate</code> only means the structure is right and no obvious placeholder or secret was found.</li>
+        <li>You need to enforce what an AI tool does: the context is guidance, not policy enforcement.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Your existing files</h2>
+  <p>AIContext does not overwrite what you already have.</p>
   <ul>
-    <li><a href="./user-manual.md">User manual</a></li>
-    <li><a href="./README.md">README</a></li>
+    <li><code>export</code> replaces only files that carry the <code>Auto-generated by aicontext export</code> header. Any other existing file is a conflict: nothing is written until you pass <code>--force</code>.</li>
+    <li><code>aicontext init</code> lists the hand-written instruction files it finds, and <code>export --dry-run</code> shows what would change. The <a href="./user-manual.md">user manual</a> has a step-by-step migration recipe (chapter 11, B).</li>
+    <li>Export never writes or deletes outside the project, even through symlinks or junctions, and refuses a <code>context.json</code> that <code>validate</code> rejects.</li>
+  </ul>
+
+  <h2>Supported tools and their limits</h2>
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Generated file</th><th>Scoped rules (<code>split</code> layout)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>GitHub Copilot</td><td><code>.github/copilot-instructions.md</code></td><td><code>.github/instructions/*.instructions.md</code></td></tr>
+      <tr><td>Claude Code</td><td><code>CLAUDE.md</code></td><td><code>.claude/rules/*.md</code></td></tr>
+      <tr><td>Cursor</td><td><code>.cursor/rules/*.mdc</code></td><td><code>.mdc</code> rules with globs or a description</td></tr>
+      <tr><td>Windsurf</td><td><code>.windsurf/rules/*.md</code></td><td>rules with a glob or model-decision trigger</td></tr>
+      <tr><td>Devin (opt-in)</td><td><code>.devin/rules/*.md</code></td><td>same format as Windsurf</td></tr>
+      <tr><td>Aider</td><td><code>CONVENTIONS.md</code></td><td>none (one file)</td></tr>
+      <tr><td>Tools that read <code>AGENTS.md</code></td><td><code>AGENTS.md</code></td><td>none; optional nested <code>AGENTS.md</code> per directory</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>The per-tool rule formats follow the vendors' documentation; they have not yet been verified against every tool in real projects.</li>
+    <li>Some tools read several of these files together (for example Copilot in VS Code reads <code>AGENTS.md</code> too). <code>aicontext status</code> shows the context size per tool and these overlaps as an estimate.</li>
+    <li>The secret lint is a heuristic and does not replace a dedicated secret scanner.</li>
+  </ul>
+
+  <h2>Install and guides</h2>
+<pre><code>dotnet tool install --global AIContext.CLI
+aicontext --help</code></pre>
+  <ul>
     <li><a href="https://github.com/aicontext-dev/aicontext/releases/latest">Download the CLI (no .NET required)</a></li>
+    <li><a href="./user-manual.md">User manual</a>: quick start, all commands, CI, recipes, troubleshooting</li>
+    <li><a href="./README.md">README</a></li>
   </ul>
 
   <h2>Specification</h2>
@@ -34,6 +146,7 @@
     <li><a href="./spec/">Specification overview</a></li>
     <li><a href="./SPEC.md">SPEC.md</a></li>
     <li><a href="./schema/v1/context.schema.json">JSON Schema (v1)</a></li>
+    <li><a href="./conformance/README.md">Conformance suite</a> for independent implementations</li>
     <li><a href="./GOVERNANCE.md">Governance</a></li>
     <li><a href="./CHANGELOG.md">Changelog</a></li>
   </ul>

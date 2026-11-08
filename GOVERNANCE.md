@@ -1,7 +1,7 @@
 # AIContext Governance
 
 Status: DRAFT  
-Last updated: 2026-11-01
+Last updated: 2026-11-08
 
 ## 1. Scope
 
@@ -65,6 +65,20 @@ Any MAJOR change MUST include explicit migration guidance.
 - Versioned schema URLs, once published, MUST remain available.
 - Existing versions MUST NOT change behavior retroactively.
 - Breaking changes require a new MAJOR version path.
+
+### 6.1 Draft period (0.x)
+
+Until the specification leaves draft status (its first stable release), the commitment above applies with one exception, which [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version) already describes: backward-compatible additions MAY be made within the current `specVersion`, and the table in that section records which tool version introduced which change. The schema does not allow unknown properties, so a validator from before such an addition rejects a newer document that uses it, while every document that was valid before stays valid. The first change that makes existing documents invalid or changes their meaning bumps `specVersion`.
+
+### 6.2 Before the first stable release
+
+Before the specification is declared stable the maintainers plan to decide and document:
+
+- which published schema versions become immutable, and under which URLs,
+- how an implementation reacts to a document that declares a newer `specVersion` or uses properties it does not know (reject, or accept with a warning),
+- the [conformance suite](./conformance/README.md) that independent implementations can run, extended with the cases that define these compatibility rules.
+
+Until then the suite only covers the draft `0.1.0` format, and cases may be added to it.
 
 ## 7. Conduct and collaboration
 

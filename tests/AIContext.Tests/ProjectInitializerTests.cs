@@ -106,6 +106,34 @@ public sealed class ProjectInitializerTests : IDisposable
     }
 
     [Fact]
+    public void FindExistingInstructionFiles_NothingThere_ReturnsEmpty()
+    {
+        Assert.Empty(ProjectInitializer.FindExistingInstructionFiles(_basePath));
+    }
+
+    [Fact]
+    public void FindExistingInstructionFiles_HandWrittenFiles_AreListedByTheirTargetPath()
+    {
+        File.WriteAllText(Path.Combine(_basePath, "AGENTS.md"), "# My rules");
+        File.WriteAllText(Path.Combine(_basePath, "CLAUDE.md"), "# Claude rules");
+        Directory.CreateDirectory(Path.Combine(_basePath, ".github"));
+        File.WriteAllText(Path.Combine(_basePath, ".github", "copilot-instructions.md"), "Be concise.");
+
+        var found = ProjectInitializer.FindExistingInstructionFiles(_basePath);
+
+        Assert.Equal(["AGENTS.md", ".github/copilot-instructions.md", "CLAUDE.md"], found);
+    }
+
+    [Fact]
+    public void FindExistingInstructionFiles_FilesGeneratedByAicontext_AreNotListed()
+    {
+        File.WriteAllText(Path.Combine(_basePath, "CONVENTIONS.md"), $"<!-- {ContextExporter.GeneratedMarker} --target aider -->\n# Conventions\n");
+        File.WriteAllText(Path.Combine(_basePath, "AGENTS.md"), "# Hand written");
+
+        Assert.Equal(["AGENTS.md"], ProjectInitializer.FindExistingInstructionFiles(_basePath));
+    }
+
+    [Fact]
     public void Initialize_ExistingFileWithForce_OverwritesFiles()
     {
         var contextDirectory = Path.Combine(_basePath, ".aicontext");

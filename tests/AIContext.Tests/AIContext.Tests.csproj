@@ -14,4 +14,7 @@
     <ProjectReference Include="..\..\src\AIContext\AIContext.csproj" />
     <ProjectReference Include="..\..\src\AIContext.CLI\AIContext.CLI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\conformance\**\*.json" Link="conformance\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
