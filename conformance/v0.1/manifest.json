@@ -1,0 +1,26 @@
+{
+  "specVersion": "0.1.0",
+  "description": "Conformance cases for context.json of the AIContext specification 0.1.0 (draft). Each case is a complete context.json. A case is valid when an implementation reports no error for it; for an invalid case it MUST report at least one error located at 'pointer' (an RFC 6901 JSON Pointer into the document; the empty string is the document root). Only the location is part of the contract, not the wording of the message.",
+  "cases": [
+    { "file": "valid/minimal.json", "valid": true, "description": "Only the required properties." },
+    { "file": "valid/full.json", "valid": true, "description": "Every optional property of the format with a valid value." },
+    { "file": "valid/all-targets.json", "valid": true, "description": "All seven export targets, the split layout and nestedAgents." },
+    { "file": "valid/default-target-listed.json", "valid": true, "description": "defaultTarget is one of exports.targets." },
+    { "file": "invalid/not-an-object.json", "valid": false, "pointer": "", "description": "The document is not a JSON object." },
+    { "file": "invalid/missing-spec-version.json", "valid": false, "pointer": "", "description": "Required property specVersion is missing." },
+    { "file": "invalid/missing-project.json", "valid": false, "pointer": "", "description": "Required property project is missing." },
+    { "file": "invalid/unsupported-spec-version.json", "valid": false, "pointer": "/specVersion", "description": "A specVersion this version of the specification does not define." },
+    { "file": "invalid/spec-version-not-a-string.json", "valid": false, "pointer": "/specVersion", "description": "specVersion must be a string." },
+    { "file": "invalid/unknown-top-level-property.json", "valid": false, "pointer": "/bogus", "description": "Unknown properties are not allowed in 0.1.0." },
+    { "file": "invalid/project-name-empty.json", "valid": false, "pointer": "/project/name", "description": "project.name must not be empty." },
+    { "file": "invalid/project-name-whitespace.json", "valid": false, "pointer": "/project/name", "description": "project.name must not be whitespace only (a rule JSON Schema cannot express)." },
+    { "file": "invalid/project-name-not-a-string.json", "valid": false, "pointer": "/project/name", "description": "project.name must be a string." },
+    { "file": "invalid/unknown-target.json", "valid": false, "pointer": "/exports/targets/0", "description": "exports.targets may only contain the seven known targets." },
+    { "file": "invalid/duplicate-targets.json", "valid": false, "pointer": "/exports/targets", "description": "exports.targets must not contain duplicates." },
+    { "file": "invalid/empty-targets.json", "valid": false, "pointer": "/exports/targets", "description": "exports.targets must contain at least one target." },
+    { "file": "invalid/unknown-layout.json", "valid": false, "pointer": "/exports/layout", "description": "exports.layout must be single or split." },
+    { "file": "invalid/nested-agents-not-a-boolean.json", "valid": false, "pointer": "/exports/nestedAgents", "description": "exports.nestedAgents must be a boolean." },
+    { "file": "invalid/default-target-not-listed.json", "valid": false, "pointer": "/exports/defaultTarget", "description": "defaultTarget must be 'all' or one of exports.targets (a rule JSON Schema cannot express)." },
+    { "file": "invalid/last-reviewed-not-a-date.json", "valid": false, "pointer": "/metadata/lastReviewed", "description": "metadata.lastReviewed must be a date (YYYY-MM-DD)." }
+  ]
+}

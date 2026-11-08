@@ -1,0 +1,10 @@
+{
+  "specVersion": "0.1.0",
+  "project": {
+    "name": "demo"
+  },
+  "exports": {
+    "layout": "split",
+    "nestedAgents": "yes"
+  }
+}

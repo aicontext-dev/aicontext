@@ -9,6 +9,7 @@ on:
       - "README.md"
       - "GOVERNANCE.md"
       - "CHANGELOG.md"
+      - "conformance/**"
       - "schema/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -44,6 +45,7 @@ jobs:
           cp SPEC.md _site/SPEC.md
           cp GOVERNANCE.md _site/GOVERNANCE.md
           cp CHANGELOG.md _site/CHANGELOG.md
+          cp -r conformance _site/conformance
           cp schema/v1/context.schema.json _site/schema/v1/context.schema.json
           touch _site/.nojekyll
 

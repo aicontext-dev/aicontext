@@ -1,0 +1,12 @@
+{
+  "specVersion": "0.1.0",
+  "project": {
+    "name": "demo"
+  },
+  "exports": {
+    "targets": ["agents", "copilot", "claude", "cursor", "windsurf", "devin", "aider"],
+    "defaultTarget": "all",
+    "layout": "split",
+    "nestedAgents": true
+  }
+}
