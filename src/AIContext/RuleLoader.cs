@@ -20,10 +20,12 @@ public sealed record RuleDocument(string Name, string? Description, IReadOnlyLis
         RuleKind.Always;
 }
 
-public sealed record RuleLoadResult(
-    IReadOnlyList<RuleDocument> Rules,
-    IReadOnlyList<string> Errors,
-    IReadOnlyList<string> Warnings);
+public sealed record RuleLoadResult(IReadOnlyList<RuleDocument> Rules, IReadOnlyList<Diagnostic> Diagnostics)
+{
+    public IReadOnlyList<string> Errors => Diagnostics.ErrorMessages();
+
+    public IReadOnlyList<string> Warnings => Diagnostics.WarningMessages();
+}
 
 public static class RuleLoader
 {
@@ -41,18 +43,21 @@ public static class RuleLoader
     public static RuleLoadResult Load(string contextDirectory)
     {
         var rules = new List<RuleDocument>();
-        var errors = new List<string>();
-        var warnings = new List<string>();
+        var diagnostics = new List<Diagnostic>();
 
         var rulesDirectory = Path.Combine(contextDirectory, RulesDirectoryName);
         if (!Directory.Exists(rulesDirectory))
         {
-            return new RuleLoadResult(rules, errors, warnings);
+            return new RuleLoadResult(rules, diagnostics);
         }
 
         foreach (var directory in Directory.EnumerateDirectories(rulesDirectory))
         {
-            warnings.Add($"rules/{Path.GetFileName(directory)}/: subdirectories are ignored; rules must be directly in .aicontext/rules/.");
+            var name = Path.GetFileName(directory);
+            diagnostics.Add(Diagnostic.Warning(
+                DiagnosticCodes.IgnoredRuleDirectory,
+                $"rules/{name}/: subdirectories are ignored; rules must be directly in .aicontext/rules/.",
+                $".aicontext/rules/{name}"));
         }
 
         var files = Directory.EnumerateFiles(rulesDirectory)
@@ -63,41 +68,51 @@ public static class RuleLoader
             var fileName = Path.GetFileName(file);
             if (!fileName.EndsWith(".md", StringComparison.Ordinal))
             {
-                warnings.Add($"rules/{fileName}: ignored (only .md files are rules).");
+                diagnostics.Add(Diagnostic.Warning(
+                    DiagnosticCodes.IgnoredRuleFile,
+                    $"rules/{fileName}: ignored (only .md files are rules).",
+                    $".aicontext/rules/{fileName}"));
                 continue;
             }
 
-            var rule = LoadRule(file, fileName, errors, warnings);
+            var rule = LoadRule(file, fileName, diagnostics);
             if (rule is not null)
             {
                 rules.Add(rule);
             }
         }
 
-        return new RuleLoadResult(rules, errors, warnings);
+        return new RuleLoadResult(rules, diagnostics);
     }
 
-    private static RuleDocument? LoadRule(string path, string fileName, List<string> errors, List<string> warnings)
+    private static RuleDocument? LoadRule(string path, string fileName, List<Diagnostic> diagnostics)
     {
         var name = fileName[..^3];
         var label = $"rules/{fileName}";
+        var location = $".aicontext/rules/{fileName}";
         var valid = true;
 
         if (!NamePattern.IsMatch(name))
         {
-            errors.Add($"{label}: file name must use lowercase letters, digits, '-' or '_' (it becomes part of generated file names).");
+            diagnostics.Add(Diagnostic.Error(
+                DiagnosticCodes.InvalidRuleName,
+                $"{label}: file name must use lowercase letters, digits, '-' or '_' (it becomes part of generated file names).",
+                location));
             valid = false;
         }
         else if (ReservedNames.Contains(name))
         {
-            errors.Add($"{label}: '{name}' is reserved for a built-in section; choose another file name.");
+            diagnostics.Add(Diagnostic.Error(
+                DiagnosticCodes.ReservedRuleName,
+                $"{label}: '{name}' is reserved for a built-in section; choose another file name.",
+                location));
             valid = false;
         }
 
         var parsed = Frontmatter.Parse(File.ReadAllText(path));
         if (parsed.Error is not null)
         {
-            errors.Add($"{label}: {parsed.Error}");
+            diagnostics.Add(Diagnostic.Error(DiagnosticCodes.InvalidFrontmatter, $"{label}: {parsed.Error}", location));
             return null;
         }
 
@@ -108,13 +123,19 @@ public static class RuleLoader
         {
             if (!KnownKeys.Contains(key))
             {
-                warnings.Add($"{label}: unknown frontmatter key '{key}' is ignored.");
+                diagnostics.Add(Diagnostic.Warning(
+                    DiagnosticCodes.UnknownFrontmatterKey,
+                    $"{label}: unknown frontmatter key '{key}' is ignored.",
+                    location));
             }
             else if (key == "description")
             {
                 if (value.IsList)
                 {
-                    errors.Add($"{label}: 'description' must be a single line of text.");
+                    diagnostics.Add(Diagnostic.Error(
+                        DiagnosticCodes.InvalidRuleDescription,
+                        $"{label}: 'description' must be a single line of text.",
+                        location));
                     valid = false;
                 }
                 else if (!string.IsNullOrWhiteSpace(value.Scalar))
@@ -137,7 +158,10 @@ public static class RuleLoader
 
                     if (entry.Contains('\\', StringComparison.Ordinal))
                     {
-                        errors.Add($"{label}: path '{entry}' must use '/' as separator.");
+                        diagnostics.Add(Diagnostic.Error(
+                            DiagnosticCodes.InvalidRulePathSeparator,
+                            $"{label}: path '{entry}' must use '/' as separator.",
+                            location));
                         valid = false;
                     }
 
@@ -149,7 +173,7 @@ public static class RuleLoader
         var body = parsed.Body.Trim();
         if (body.Length == 0)
         {
-            warnings.Add($"{label}: rule is empty and will be skipped.");
+            diagnostics.Add(Diagnostic.Warning(DiagnosticCodes.EmptyRule, $"{label}: rule is empty and will be skipped.", location));
             return null;
         }
 

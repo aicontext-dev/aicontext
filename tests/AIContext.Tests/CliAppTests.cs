@@ -397,4 +397,63 @@ public sealed class CliAppTests : IDisposable
         Assert.Equal(0, result.ExitCode);
         Assert.True(File.Exists(PathOf("AGENTS.md")));
     }
+
+    [Fact]
+    public void Export_UnsupportedTarget_ReturnsErrorAndWritesNothing()
+    {
+        InitProject();
+
+        var result = Run("export", "--target", "nope");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("ERROR: Unsupported export target 'nope'", result.Error);
+        Assert.Contains("No files were written", result.Error);
+    }
+
+    [Fact]
+    public void Export_NoTargetAndNoDefaultTarget_NamesTheCliOption()
+    {
+        InitProject();
+
+        var result = Run("export");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Missing required option: --target", result.Error);
+    }
+
+    [Fact]
+    public void Export_UnsupportedLayout_ReturnsError()
+    {
+        InitProject();
+
+        var result = Run("export", "--target", "agents", "--layout", "wide");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Unsupported layout 'wide'", result.Error);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_DefaultTargetFromContext_IsAnnounced()
+    {
+        InitProject();
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "defaultTarget": "claude" } }""");
+
+        var result = Run("export");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Using exports.defaultTarget 'claude'", result.Output);
+        Assert.True(File.Exists(PathOf("CLAUDE.md")));
+    }
+
+    [Fact]
+    public void Status_UnsupportedLayout_ReturnsError()
+    {
+        InitProject();
+
+        var result = Run("status", "--layout", "wide");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("ERROR: Unsupported layout 'wide'", result.Error);
+    }
 }
