@@ -1,8 +1,12 @@
 namespace AIContext;
 
+// A path that must not be touched. Code is the diagnostic code that describes it.
+internal sealed record PathProblem(string Code, string Description);
+
 // Decides whether a generated file may be written or deleted (D12): the real location of the file, with every
-// symlink and junction on the way resolved, must be inside the real project root. Links that stay inside the
-// root are allowed. Both sides are resolved, so a project that is itself reached through a link still works.
+// symlink and junction on the way resolved, must be inside the real project root, and not inside a separate
+// project (D11) that a link leads to. Links that stay inside the root are allowed. Both sides are resolved, so a
+// project that is itself reached through a link still works.
 internal sealed class ExportPathGuard
 {
     private const int MaxLinkDepth = 40;
@@ -20,24 +24,35 @@ internal sealed class ExportPathGuard
         _root = root;
     }
 
-    // Null when the path is safe; otherwise a short description of why it must not be touched.
-    public string? FindProblem(string path)
+    // Null when the path is safe; otherwise why it must not be touched.
+    public PathProblem? FindProblem(string path)
     {
         try
         {
             _realRoot ??= ResolveRealPath(_root);
             var real = ResolveRealPath(path);
-            return IsInside(_realRoot, real)
+            if (!IsInside(_realRoot, real))
+            {
+                return new PathProblem(
+                    DiagnosticCodes.PathOutsideProject,
+                    $"resolves to '{real}', outside the project, through a link");
+            }
+
+            var directory = Path.GetDirectoryName(real);
+            var separateProject = directory is null ? null : ProjectBoundary.FindProjectBetween(_realRoot, directory);
+            return separateProject is null
                 ? null
-                : $"resolves to '{real}', outside the project, through a link";
+                : new PathProblem(
+                    DiagnosticCodes.PathInSeparateProject,
+                    $"resolves to '{real}', inside the separate project '{separateProject}' (it has its own .aicontext/)");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return $"could not be checked for links ({ex.Message})";
+            return new PathProblem(DiagnosticCodes.PathOutsideProject, $"could not be checked for links ({ex.Message})");
         }
     }
 
-    private static string ResolveRealPath(string path) => Resolve(Path.GetFullPath(path), 0);
+    internal static string ResolveRealPath(string path) => Resolve(Path.GetFullPath(path), 0);
 
     // Walks the path from its root and restarts with the link target whenever a component is a link.
     // Components that do not exist yet cannot be links, so the rest of the path is kept as is.
@@ -86,7 +101,7 @@ internal sealed class ExportPathGuard
         return Path.GetFullPath(target, Path.GetDirectoryName(path)!);
     }
 
-    private static bool IsInside(string root, string path)
+    internal static bool IsInside(string root, string path)
     {
         var trimmedRoot = root.TrimEnd(Separators);
         return string.Equals(path.TrimEnd(Separators), trimmedRoot, PathComparison) ||

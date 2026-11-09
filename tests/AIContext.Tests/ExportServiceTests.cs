@@ -313,6 +313,37 @@ public sealed class ExportServiceTests : IDisposable
     }
 
     [Fact]
+    public void Plan_OutputDirectoryIsLinkIntoSeparateProject_ReportsAIC4104AndApplyRefuses()
+    {
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        Directory.CreateDirectory(InProject("pkg/child/src"));
+        TestLinks.CreateDirectoryLink(InProject(".github"), InProject("pkg/child/src"));
+        _links.Add(InProject(".github"));
+
+        var plan = Plan("copilot");
+
+        var problem = ErrorWithCode(plan, DiagnosticCodes.PathInSeparateProject);
+        Assert.Equal(".github/copilot-instructions.md", problem.Location);
+        Assert.Throws<InvalidOperationException>(() => ExportService.Apply(plan));
+        Assert.Empty(Directory.GetFileSystemEntries(InProject("pkg/child/src")));
+    }
+
+    [Fact]
+    public void Apply_DirectoryBecameLinkIntoSeparateProjectAfterPlanning_WritesNothingThere()
+    {
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        Directory.CreateDirectory(InProject("pkg/child/src"));
+        var plan = Plan("copilot");
+        TestLinks.CreateDirectoryLink(InProject(".github"), InProject("pkg/child/src"));
+        _links.Add(InProject(".github"));
+
+        var result = ExportService.Apply(plan);
+
+        Assert.Equal(DiagnosticCodes.PathInSeparateProject, Assert.Single(result.Diagnostics).Code);
+        Assert.Empty(Directory.GetFileSystemEntries(InProject("pkg/child/src")));
+    }
+
+    [Fact]
     public void Apply_FileAppearsJustBeforeWriting_ExclusiveCreateRefusesToOverwrite()
     {
         var path = InProject("AGENTS.md");
