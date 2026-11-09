@@ -220,6 +220,7 @@ public sealed class CliApp
             _out.WriteLine($"{DescribeStatus(file.Status, preview || plan.HasErrors)} ({file.Target}): {file.Path}");
         }
 
+        WriteOrphanedTargetWarnings(plan.Diagnostics);
         if (plan.HasErrors)
         {
             WriteErrors(plan.Diagnostics);
@@ -272,6 +273,15 @@ public sealed class CliApp
     private static bool IsContextError(Diagnostic diagnostic) =>
         diagnostic.IsError &&
         (diagnostic.Code.StartsWith("AIC1", StringComparison.Ordinal) || diagnostic.Code.StartsWith("AIC2", StringComparison.Ordinal));
+
+    // Context warnings belong to 'validate'; this one is about the files export leaves behind, so export and status show it.
+    private void WriteOrphanedTargetWarnings(IEnumerable<Diagnostic> diagnostics)
+    {
+        foreach (var diagnostic in diagnostics.Where(d => d.Code == DiagnosticCodes.OrphanedTargetExport))
+        {
+            _out.WriteLine($"WARNING: {diagnostic.Message}");
+        }
+    }
 
     private void WriteErrors(IEnumerable<Diagnostic> diagnostics)
     {
@@ -343,6 +353,11 @@ public sealed class CliApp
         _out.WriteLine("Always on = loaded in every request. Scoped / on-demand = loaded only for matching files or when relevant.");
         _out.WriteLine($"Token counts are estimates (~{ExportStatus.CharsPerToken} characters per token).");
 
+        if (report.Diagnostics.Any(d => d.Code == DiagnosticCodes.OrphanedTargetExport))
+        {
+            _out.WriteLine();
+            WriteOrphanedTargetWarnings(report.Diagnostics);
+        }
         var overlaps = report.Overlaps;
         if (overlaps.Count > 0)
         {

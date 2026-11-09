@@ -18,6 +18,10 @@ public static class ToolOverlaps
         new("Devin", "devin", ["agents", "windsurf"])
     ];
 
+    // Tools that read the file of another target in addition to their own (for example Copilot reads AGENTS.md).
+    public static IReadOnlyList<string> ReadersOf(string target) =>
+        Known.Where(tool => tool.AlsoReads.Contains(target, StringComparer.Ordinal)).Select(tool => tool.Tool).ToList();
+
     public static IReadOnlyList<ToolOverlap> Compute(IReadOnlyList<TargetStatus> statuses)
     {
         var byTarget = statuses.ToDictionary(s => s.Target, StringComparer.Ordinal);

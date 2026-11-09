@@ -229,7 +229,7 @@ public static class ExportWriter
 
     private const int MaxWalkDepth = 12;
 
-    private static IEnumerable<string> FindFilesByName(string directory, string fileName, int depth)
+    internal static IEnumerable<string> FindFilesByName(string directory, string fileName, int depth)
     {
         if (depth > 0)
         {
