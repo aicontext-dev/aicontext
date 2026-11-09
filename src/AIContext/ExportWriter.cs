@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 
 namespace AIContext;
@@ -15,7 +16,22 @@ public enum ExportFileStatus
     Blocked
 }
 
-public sealed record ExportFilePlan(string Target, string Path, string Content, ExportFileStatus Status, string? Reason = null);
+// ExistingHash is the SHA-256 of the file as it was when it was planned (null when it did not exist). Apply
+// compares it with the file on disk, so a plan that went stale is refused instead of overwriting newer content.
+public sealed record ExportFilePlan(
+    string Target,
+    string Path,
+    string Content,
+    ExportFileStatus Status,
+    string? Reason = null,
+    string? ExistingHash = null);
+
+// Thrown when a file appeared between the check and the write of a new file.
+public sealed class StaleExportPlanException(string path)
+    : IOException($"{path} was created after the export was planned.")
+{
+    public string FilePath { get; } = path;
+}
 
 public static class ExportWriter
 {
@@ -53,18 +69,87 @@ public static class ExportWriter
         return PlanFile(new ExportPathGuard(basePath), target.Name, ExportTarget.ResolveRelative(basePath, output.RelativePath), output.Content, force);
     }
 
+    // Writes one planned file. A new file is created exclusively, so a file that appeared after planning is
+    // never overwritten. ExportService.Apply verifies the whole plan before it calls this.
     public static void Apply(ExportFilePlan plan)
     {
         switch (plan.Status)
         {
-            case ExportFileStatus.Created or ExportFileStatus.Updated:
+            case ExportFileStatus.Created:
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(plan.Path)!);
+                try
+                {
+                    using var stream = new FileStream(plan.Path, FileMode.CreateNew, FileAccess.Write);
+                    stream.Write(new UTF8Encoding(false).GetBytes(plan.Content));
+                }
+                catch (IOException) when (File.Exists(plan.Path))
+                {
+                    throw new StaleExportPlanException(plan.Path);
+                }
+
+                break;
+            case ExportFileStatus.Updated:
                 File.WriteAllText(plan.Path, plan.Content, new UTF8Encoding(false));
                 break;
             case ExportFileStatus.Deleted:
                 File.Delete(plan.Path);
                 break;
         }
+    }
+
+    // Null when the file may still be written as planned; otherwise the reason it must not be: its path now
+    // leaves the project through a link, or the file is not in the state it was planned for.
+    internal static Diagnostic? Verify(ExportFilePlan plan, ExportPathGuard guard, string basePath)
+    {
+        if (plan.Status is not (ExportFileStatus.Created or ExportFileStatus.Updated or ExportFileStatus.Deleted))
+        {
+            return null;
+        }
+
+        var location = System.IO.Path.GetRelativePath(basePath, plan.Path).Replace('\\', '/');
+        var problem = guard.FindProblem(plan.Path);
+        if (problem is not null)
+        {
+            return Diagnostic.Error(
+                DiagnosticCodes.PathOutsideProject,
+                $"{plan.Path} {problem}. Export never writes or deletes outside the project.",
+                location);
+        }
+
+        string? current;
+        try
+        {
+            current = File.Exists(plan.Path) ? HashOf(File.ReadAllBytes(plan.Path)) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return StalePlan(plan.Path, location, $"could not be read again ({ex.Message})");
+        }
+
+        if (string.Equals(current, plan.ExistingHash, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return StalePlan(
+            plan.Path,
+            location,
+            plan.ExistingHash is null ? "was created after the export was planned" : "changed or was removed after the export was planned");
+    }
+
+    internal static Diagnostic StalePlan(string path, string location, string reason) =>
+        Diagnostic.Error(
+            DiagnosticCodes.StaleExportPlan,
+            $"{path} {reason}. The export plan is out of date; plan the export again.",
+            location);
+
+    private static string HashOf(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+
+    // Same decoding as File.ReadAllText (UTF-8, byte order mark honored), so the text and the hash come from one read.
+    private static string DecodeText(byte[] bytes)
+    {
+        using var reader = new StreamReader(new MemoryStream(bytes), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     public static bool IsGenerated(string content)
@@ -88,14 +173,15 @@ public static class ExportWriter
             return new ExportFilePlan(targetName, path, content, ExportFileStatus.Created);
         }
 
-        var existing = File.ReadAllText(path);
+        var bytes = File.ReadAllBytes(path);
+        var existing = DecodeText(bytes);
         if (string.Equals(ContextExporter.NormalizeLineEndings(existing), content, StringComparison.Ordinal))
         {
             return new ExportFilePlan(targetName, path, content, ExportFileStatus.Unchanged);
         }
 
         var status = force || IsGenerated(existing) ? ExportFileStatus.Updated : ExportFileStatus.Conflict;
-        return new ExportFilePlan(targetName, path, content, status);
+        return new ExportFilePlan(targetName, path, content, status, ExistingHash: HashOf(bytes));
     }
 
     // Checked before the file is read, so nothing outside the project is even opened.
@@ -129,9 +215,9 @@ public static class ExportWriter
             {
                 yield return blocked;
             }
-            else if (IsGenerated(File.ReadAllText(file)))
+            else if (PlanDeletion(target.Name, file) is { } deletion)
             {
-                yield return new ExportFilePlan(target.Name, file, string.Empty, ExportFileStatus.Deleted);
+                yield return deletion;
             }
         }
     }
@@ -222,10 +308,19 @@ public static class ExportWriter
             {
                 yield return blocked;
             }
-            else if (IsGenerated(File.ReadAllText(file)))
+            else if (PlanDeletion(target.Name, file) is { } deletion)
             {
-                yield return new ExportFilePlan(target.Name, file, string.Empty, ExportFileStatus.Deleted);
+                yield return deletion;
             }
         }
+    }
+
+    // Only a file that still carries the generated header is removed; the hash lets Apply notice a later change.
+    private static ExportFilePlan? PlanDeletion(string targetName, string file)
+    {
+        var bytes = File.ReadAllBytes(file);
+        return IsGenerated(DecodeText(bytes))
+            ? new ExportFilePlan(targetName, file, string.Empty, ExportFileStatus.Deleted, ExistingHash: HashOf(bytes))
+            : null;
     }
 }
