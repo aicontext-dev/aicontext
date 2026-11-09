@@ -2,7 +2,7 @@
 
 Status: DRAFT  
 Version: 0.1.0-draft  
-Last updated: 2026-11-03
+Last updated: 2026-11-09
 
 ---
 
@@ -305,6 +305,7 @@ While the specification is a draft (`0.x`), additions may be made within the cur
 | 0.3.0 | 0.1.0-draft | Rules (4.4), safe overwrite (6.3), layouts and nested `AGENTS.md` (6.4), `devin` target |
 | 0.4.0 | 0.1.0-draft | None; `exports.defaultTarget` semantics clarified (6.1) |
 | 0.5.0 | 0.1.0-draft | None; requirements clarified: no writes outside the project and separate projects (6.3, 6.4), export applies validation errors (7), the secret lint is a heuristic (10) |
+| 0.6.0 | 0.1.0-draft | None; requirements clarified: the properties of `context.json` and the rules beyond the schema (5.1, 5.2; the schema now also states that `project.name` has a non-whitespace character), a plan is verified again before writing (6.3), separate projects also behind links (6.4). No document that was valid before is rejected |
 
 ## 10. Security and privacy guidance
 
