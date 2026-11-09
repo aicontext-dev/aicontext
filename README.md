@@ -91,7 +91,8 @@ AIContext does not overwrite what you already have.
 Limits to know about:
 
 - The per-tool rule formats follow the vendors' documentation; they have not yet been verified against every tool in real projects.
-- Some tools read several of these files together (for example Copilot in VS Code reads `AGENTS.md` too). `aicontext status` shows the context size per tool and these overlaps as an estimate.
+- Some tools read several of these files together (for example the Local agent of Copilot in VS Code reads `AGENTS.md` and `CLAUDE.md` too). `aicontext status` shows the context size per tool and these overlaps as an estimate.
+- A tool does not always read its file without help: Aider only reads `CONVENTIONS.md` when you start it with `aider --read CONVENTIONS.md` (or set `read: CONVENTIONS.md` in `.aider.conf.yml`), and some editors have settings for file-based instructions (for example in VS Code with Copilot). See "Does my tool read the generated file?" in the [user manual](./docs/user-manual.md).
 - The secret lint is a heuristic and does not replace a dedicated secret scanner.
 - The specification is a draft (`0.1.0-draft`) and the tools are `0.x`, so formats and behavior can still change; see the [CHANGELOG](./CHANGELOG.md).
 

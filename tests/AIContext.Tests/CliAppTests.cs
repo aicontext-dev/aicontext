@@ -344,6 +344,36 @@ public sealed class CliAppTests : IDisposable
     }
 
     [Fact]
+    public void Init_WithHandWrittenRuleFiles_ListsThemAndSaysTheyStayActive()
+    {
+        Directory.CreateDirectory(PathOf(".github/instructions"));
+        File.WriteAllText(PathOf(".github/instructions/api.instructions.md"), "---\napplyTo: 'src/**'\n---\nRule.");
+
+        var result = Run("init", "--name", "demo");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("  .github/instructions/api.instructions.md", result.Output);
+        Assert.Contains("stay active next to the generated ones", result.Output);
+        Assert.Contains("Other places are not searched", result.Output);
+    }
+
+    [Fact]
+    public void Init_ManyHandWrittenRuleFiles_ListsOnlyTheFirstOnes()
+    {
+        Directory.CreateDirectory(PathOf(".cursor/rules"));
+        for (var i = 0; i < 13; i++)
+        {
+            File.WriteAllText(PathOf($".cursor/rules/rule-{i:00}.mdc"), "---\nalwaysApply: true\n---\nRule.");
+        }
+
+        var result = Run("init", "--name", "demo");
+
+        Assert.Contains("  .cursor/rules/rule-00.mdc", result.Output);
+        Assert.DoesNotContain("rule-12.mdc", result.Output);
+        Assert.Contains("... and 3 more", result.Output);
+    }
+
+    [Fact]
     public void Init_WithoutInstructionFiles_PrintsNoMigrationHint()
     {
         var result = Run("init", "--name", "demo");

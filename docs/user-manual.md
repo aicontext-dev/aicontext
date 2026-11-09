@@ -171,7 +171,7 @@ Created (aider): C:\projects\my-project\CONVENTIONS.md
 Export completed (6 changed, 0 unchanged).
 ```
 
-Done. Your AI assistants now know your project.
+Done. The files are generated, and most assistants pick them up from the repository by themselves. A few tools need one extra step, most notably **Aider**, which only reads `CONVENTIONS.md` when you tell it to (`aider --read CONVENTIONS.md`); see "Does my tool read the generated file?" in chapter 6.
 
 ### Step 6: What to commit
 
@@ -432,7 +432,7 @@ Overlap: these tools read several of the exported files and load them together
 Tip: export only the targets of the tools you use, or leave out 'agents' when every tool you use has its own format.
 ```
 
-The list follows the vendors' documentation (Copilot in VS Code combines `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`; Cursor supports `AGENTS.md` next to `.cursor/rules`; Devin reads `AGENTS.md` and both `.devin/rules` and `.windsurf/rules`). What a tool really loads depends on its version and settings, so treat the numbers as an estimate. It is information only: it is not a warning of `validate`.
+The list follows the vendors' documentation (the Local agent of Copilot in VS Code combines `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`, while the Copilot agent reads the first two and the Claude agent only `CLAUDE.md`; Cursor supports `AGENTS.md` next to `.cursor/rules`; Devin reads `AGENTS.md` and both `.devin/rules` and `.windsurf/rules`). What a tool really loads depends on its version and settings, so treat the numbers as an estimate. It is information only: it is not a warning of `validate`.
 
 With the `single` layout it also prints a tip about how much `split` would reduce the always-on context.
 
@@ -469,6 +469,37 @@ Enable only the tools your team actually uses, in `context.json`:
 ```
 
 Beware of overlap: several tools read `AGENTS.md` **in addition** to their own files (for example Copilot, Cursor, Devin). If you export `agents` together with their own targets, they may see the same content twice. `aicontext status` lists the tools affected and how much always-on content they load together. If that bothers you, keep `agents` only for tools that have no other format.
+
+### Does my tool read the generated file?
+
+Generating a file is not the same as the tool loading it. Most tools pick up their file from the repository by themselves, a few need one step from you, and some behave differently depending on which agent, mode or version of the tool you use. The table below summarizes what the vendors' documentation says (checked in November 2026; the tools change quickly, so treat it as a starting point and check the linked documentation when something does not work).
+
+| Tool | Generated file | Loaded automatically? | What you may need to do |
+|---|---|---|---|
+| GitHub Copilot (VS Code, GitHub.com, Copilot CLI and others) | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md` (`split`) | Yes, in Copilot agent sessions | In VS Code the file-based instructions are controlled by settings (see below); the nested `AGENTS.md` files are off by default |
+| Claude Code | `CLAUDE.md`, `.claude/rules/*.md` (`split`) | Yes, at the start of every session | Nothing. It reads `AGENTS.md` only when there is **no** `CLAUDE.md` in or above the working directory, so with both exported it uses `CLAUDE.md` alone |
+| Cursor | `.cursor/rules/*.mdc` | Yes; the rule's frontmatter decides when (`alwaysApply`, `globs`, description) | Nothing in a normal setup. Cursor also reads `AGENTS.md`. Only `.mdc` files in `.cursor/rules` count as rules |
+| Windsurf, Devin | `.windsurf/rules/*.md`, `.devin/rules/*.md` | Yes; `trigger` in the frontmatter decides when | Nothing. Devin also reads `AGENTS.md` (at the root and in the directories on the way to the file it works on) and imports `.windsurf/rules`, which is why exporting both `windsurf` and `devin` duplicates the rules |
+| Aider | `CONVENTIONS.md` | **No** | Load it yourself, see below |
+| Codex and other tools that read `AGENTS.md` | `AGENTS.md` | Yes, where the tool supports the format | Check the tool's documentation for nested files and settings. If a tool does not read `AGENTS.md`, point it at the file the way Aider is pointed at `CONVENTIONS.md` |
+
+**Aider** never reads `CONVENTIONS.md` on its own. Load it for one session with `aider --read CONVENTIONS.md` (or `/read CONVENTIONS.md` inside the chat), or always, by committing a `.aider.conf.yml` with:
+
+```yaml
+read: CONVENTIONS.md
+```
+
+`read` marks the file read-only, and Aider can cache it when prompt caching is enabled. The same works for any tool-neutral file you want Aider to see, for example `read: [CONVENTIONS.md, AGENTS.md]`.
+
+**GitHub Copilot in VS Code.** Which files are read depends on the **agent** you choose in the chat (VS Code calls it the harness), not on the language model: the Copilot agent reads `.github/copilot-instructions.md` and `AGENTS.md`, the Claude agent reads `CLAUDE.md`, and the Local agent reads all three. If an instruction file seems to be ignored:
+
+- check that the agent you use supports the file (the table above, and the [custom instructions reference](https://code.visualstudio.com/docs/agents/reference/custom-instructions-reference));
+- check the settings of the Local agent: `github.copilot.chat.codeGeneration.useInstructionFiles` (`.github/copilot-instructions.md`), `chat.includeApplyingInstructions` (`*.instructions.md` with `applyTo`), `chat.useAgentsMdFile`, `chat.useNestedAgentsMdFiles` (nested `AGENTS.md`, off by default) and `chat.useClaudeMdFile` (`CLAUDE.md`);
+- open the Agent Customizations editor, or look at the **References** of a response where VS Code shows them, to see which instruction files were used.
+
+The same idea applies to other editors: if a tool has a setting such as "use instruction files" or "use AGENTS.md", it must be on, and most tools show somewhere which instruction files a session loaded (for example the **Customize** page of Devin). Use that instead of asking the assistant, which cannot reliably tell you which files it was given.
+
+Because a tool can read several of the generated files, `aicontext status` reports overlaps (for example Copilot's Local agent in VS Code reads `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`); with the Copilot or Claude agent the picture is smaller, see above.
 
 ### What a generated file looks like
 
@@ -730,13 +761,15 @@ git commit -m "Add AIContext"
 
 Nothing is overwritten until you say so, and git keeps the originals (as long as they are committed), so you can move over step by step:
 
-1. `aicontext init` – besides creating `.aicontext/`, it lists the instruction files it finds that were not generated by aicontext (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, …).
+1. `aicontext init` – besides creating `.aicontext/`, it lists the instruction files it finds that were not generated by aicontext: the main file of each tool (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, …), hand-written files in the tools' rule directories (`.github/instructions/`, `.claude/rules/`, `.cursor/rules/`, `.windsurf/rules/`, `.devin/rules/`) and nested `AGENTS.md` files. Other places are not searched, so look for older formats yourself.
 2. Move the content into `.aicontext/` (general description → `README.md`, "never do" → `constraints.md`, architecture explanation → `architecture.md`, advice for part of the code → a rule in `rules/`, chapter 7). Decide what to keep; you do not have to move everything.
 3. `aicontext export --target all --dry-run` – the files reported as `Conflict` are your hand-written ones. Nothing is written, with or without `--dry-run`, as long as a conflict exists.
 4. When you have moved what you want, run `aicontext export --target all --force`. The hand-written files are replaced with generated ones. Review `git diff`: a line that is missing in the new file is content you did not move; `git restore <file>` brings the original back at any time.
 5. Commit `.aicontext/` together with the generated files. From now on edit only `.aicontext/` (the generated files carry a header that says so).
 
 Alternatively leave a tool out of `exports.targets` (for example `agents`) and keep its hand-written file as it is.
+
+Hand-written **rule** files (for example `.github/instructions/api.instructions.md` or `.cursor/rules/style.mdc`) and nested `AGENTS.md` files are not touched by `export` (it only replaces the files it generates, which carry the aicontext header and, for rules, the `aicontext-` name prefix). That means they stay **active next to** the generated rules, and a rule that exists in both places is loaded twice. After the first export move what you want into `.aicontext/rules/`, then delete the old file yourself.
 
 ### C. The team started using another tool
 

@@ -128,7 +128,8 @@ Export completed (6 changed, 0 unchanged).</code></pre>
   </table>
   <ul>
     <li>The per-tool rule formats follow the vendors' documentation; they have not yet been verified against every tool in real projects.</li>
-    <li>Some tools read several of these files together (for example Copilot in VS Code reads <code>AGENTS.md</code> too). <code>aicontext status</code> shows the context size per tool and these overlaps as an estimate.</li>
+    <li>Some tools read several of these files together (for example the Local agent of Copilot in VS Code reads <code>AGENTS.md</code> and <code>CLAUDE.md</code> too). <code>aicontext status</code> shows the context size per tool and these overlaps as an estimate.</li>
+    <li>A tool does not always read its file without help: Aider only reads <code>CONVENTIONS.md</code> when you start it with <code>aider --read CONVENTIONS.md</code> (or set <code>read: CONVENTIONS.md</code> in <code>.aider.conf.yml</code>), and some editors have settings for file-based instructions (for example in VS Code with Copilot). See &ldquo;Does my tool read the generated file?&rdquo; in the <a href="./user-manual.md">user manual</a>.</li>
     <li>The secret lint is a heuristic and does not replace a dedicated secret scanner.</li>
   </ul>
 

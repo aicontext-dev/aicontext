@@ -134,6 +134,46 @@ public sealed class ProjectInitializerTests : IDisposable
     }
 
     [Fact]
+    public void FindExistingInstructionFiles_HandWrittenRuleFiles_AreListedAfterTheMainFiles()
+    {
+        Directory.CreateDirectory(Path.Combine(_basePath, ".github", "instructions", "backend"));
+        File.WriteAllText(Path.Combine(_basePath, ".github", "instructions", "backend", "api.instructions.md"), "Rule.");
+        Directory.CreateDirectory(Path.Combine(_basePath, ".cursor", "rules"));
+        File.WriteAllText(Path.Combine(_basePath, ".cursor", "rules", "style.mdc"), "Rule.");
+        Directory.CreateDirectory(Path.Combine(_basePath, ".claude", "rules"));
+        File.WriteAllText(Path.Combine(_basePath, ".claude", "rules", "tests.md"), "Rule.");
+        File.WriteAllText(Path.Combine(_basePath, "AGENTS.md"), "# Hand written");
+
+        var found = ProjectInitializer.FindExistingInstructionFiles(_basePath);
+
+        Assert.Equal(
+            ["AGENTS.md", ".github/instructions/backend/api.instructions.md", ".claude/rules/tests.md", ".cursor/rules/style.mdc"],
+            found);
+    }
+
+    [Fact]
+    public void FindExistingInstructionFiles_GeneratedRuleFilesAndOtherExtensions_AreNotListed()
+    {
+        Directory.CreateDirectory(Path.Combine(_basePath, ".cursor", "rules"));
+        File.WriteAllText(Path.Combine(_basePath, ".cursor", "rules", "aicontext-api.mdc"), $"<!-- {ContextExporter.GeneratedMarker} --target cursor -->\nold\n");
+        File.WriteAllText(Path.Combine(_basePath, ".cursor", "rules", "notes.txt"), "Not a rule.");
+        File.WriteAllText(Path.Combine(_basePath, ".cursor", "rules", "project.mdc"), $"<!-- {ContextExporter.GeneratedMarker} --target cursor -->\nmain\n");
+
+        Assert.Empty(ProjectInitializer.FindExistingInstructionFiles(_basePath));
+    }
+
+    [Fact]
+    public void FindExistingInstructionFiles_NestedAgentsFile_IsListedUnlessItBelongsToAnotherProject()
+    {
+        Directory.CreateDirectory(Path.Combine(_basePath, "services", "billing"));
+        File.WriteAllText(Path.Combine(_basePath, "services", "billing", "AGENTS.md"), "# Billing rules");
+        Directory.CreateDirectory(Path.Combine(_basePath, "packages", "child", ".aicontext"));
+        File.WriteAllText(Path.Combine(_basePath, "packages", "child", "AGENTS.md"), "# Child project");
+
+        Assert.Equal(["services/billing/AGENTS.md"], ProjectInitializer.FindExistingInstructionFiles(_basePath));
+    }
+
+    [Fact]
     public void Initialize_ExistingFileWithForce_OverwritesFiles()
     {
         var contextDirectory = Path.Combine(_basePath, ".aicontext");
