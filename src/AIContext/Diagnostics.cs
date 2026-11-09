@@ -60,6 +60,7 @@ public static class DiagnosticCodes
     public const string OverwriteConflict = "AIC4101";
     public const string PathOutsideProject = "AIC4102";
     public const string StaleExportPlan = "AIC4103";
+    public const string PathInSeparateProject = "AIC4104";
 }
 
 internal static class DiagnosticExtensions
