@@ -248,6 +248,90 @@ public sealed class ExportSafetyTests : IDisposable
     }
 
     [Fact]
+    public void Plan_RuleScopedToLinkIntoSeparateProject_StaysInRootFile()
+    {
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        Directory.CreateDirectory(InProject("pkg/child/src"));
+        LinkInProject("alias", InProject("pkg/child/src"));
+        var rule = new RuleDocument("alias", null, ["alias/**"], "Body.");
+
+        var plan = NestedAgentsPlanner.Plan([rule], _project);
+
+        Assert.Empty(plan.ByDirectory);
+        Assert.Contains("'pkg/child' has its own .aicontext/", Assert.Single(plan.Kept).Reason);
+    }
+
+    [Fact]
+    public void PlanTarget_OutputDirectoryIsLinkIntoSeparateProject_IsBlockedAndNothingIsWritten()
+    {
+        var nestedSource = InProject("pkg/child/src");
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        Directory.CreateDirectory(nestedSource);
+        LinkInProject(".github", nestedSource);
+
+        var plans = Plan(Copilot, Context());
+        ApplyAll(plans);
+
+        var blocked = PlanFor(plans, ".github/copilot-instructions.md");
+        Assert.Equal(ExportFileStatus.Blocked, blocked.Status);
+        Assert.Equal(DiagnosticCodes.PathInSeparateProject, blocked.ReasonCode);
+        Assert.Contains("'pkg/child'", blocked.Reason);
+        Assert.Empty(Directory.GetFileSystemEntries(nestedSource));
+    }
+
+    [Fact]
+    public void PlanTarget_LinkDirectlyToSeparateProjectRoot_IsBlocked()
+    {
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        LinkInProject(".github", InProject("pkg/child"));
+
+        var plans = Plan(Copilot, Context());
+
+        Assert.Equal(ExportFileStatus.Blocked, PlanFor(plans, ".github/copilot-instructions.md").Status);
+    }
+
+    [Fact]
+    public void PlanTarget_GeneratedRuleFileBehindLinkIntoSeparateProject_IsNeverDeleted()
+    {
+        var nestedRules = InProject("pkg/child/rules");
+        Directory.CreateDirectory(InProject("pkg/child/.aicontext"));
+        Directory.CreateDirectory(nestedRules);
+        var orphan = Path.Combine(nestedRules, "aicontext-old.instructions.md");
+        File.WriteAllText(orphan, $"<!-- {ContextExporter.GeneratedMarker} --target copilot -->\nold\n");
+        LinkInProject(".github/instructions", nestedRules);
+
+        var plans = Plan(Copilot, Context(), ExportLayout.Split);
+        ApplyAll(plans);
+
+        Assert.Equal(ExportFileStatus.Blocked, PlanFor(plans, "aicontext-old.instructions.md").Status);
+        Assert.True(File.Exists(orphan));
+    }
+
+    [Fact]
+    public void PlanTarget_LinkToDirectoryWithoutOwnAicontext_StaysAllowed()
+    {
+        Directory.CreateDirectory(InProject("pkg/plain"));
+        LinkInProject(".github", InProject("pkg/plain"));
+
+        var plans = Plan(Copilot, Context());
+
+        Assert.Equal(ExportFileStatus.Created, PlanFor(plans, ".github/copilot-instructions.md").Status);
+    }
+
+    [Fact]
+    public void PlanTarget_ProjectThatIsItselfNestedInsideAnotherProject_IsNotBlocked()
+    {
+        var outer = Path.Combine(_root, "outer");
+        var inner = Path.Combine(outer, "inner");
+        Directory.CreateDirectory(Path.Combine(outer, ".aicontext"));
+        Directory.CreateDirectory(inner);
+
+        var plans = Plan(Agents, Context(), basePath: inner);
+
+        Assert.Equal(ExportFileStatus.Created, Assert.Single(plans).Status);
+    }
+
+    [Fact]
     public void Compute_BlockedPath_ReportsBlockedState()
     {
         Directory.CreateDirectory(Path.Combine(_project, ".aicontext"));
