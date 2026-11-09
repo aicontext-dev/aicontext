@@ -21,7 +21,8 @@ public sealed record Diagnostic(string Code, DiagnosticSeverity Severity, string
 }
 
 // Codes are grouped by area: 1xxx context files, 2xxx rules, 3xxx secret scan, 4xxx export. In 1xxx and 2xxx the
-// 0xx codes are errors and the 1xx codes warnings; in 4xxx the 1xx codes describe a single planned file.
+// 0xx codes are errors and the 1xx codes warnings; in 4xxx the 1xx codes describe a single planned file and the
+// 2xx codes are warnings about files on disk that the export does not manage.
 // A new diagnostic needs a new code here and a row in the user manual.
 public static class DiagnosticCodes
 {
@@ -61,6 +62,7 @@ public static class DiagnosticCodes
     public const string PathOutsideProject = "AIC4102";
     public const string StaleExportPlan = "AIC4103";
     public const string PathInSeparateProject = "AIC4104";
+    public const string OrphanedTargetExport = "AIC4201";
 }
 
 internal static class DiagnosticExtensions

@@ -139,6 +139,13 @@ public static class ExportService
             }
         }
 
+        // Targets that are not exported any more may still have generated files on disk; that is only a warning.
+        // Only a run for the whole configuration knows which targets are meant to be gone.
+        if (string.Equals(target, "all", StringComparison.Ordinal))
+        {
+            diagnostics.AddRange(OrphanedTargetExports.Find(basePath, targets));
+        }
+
         return new ExportPlan(basePath, targets, defaultTargetUsed, layoutResolution.Layout, files, diagnostics);
     }
 
@@ -216,6 +223,7 @@ public static class ExportService
 
         var layout = layoutResolution.Layout;
         var nestedAgents = ExportLayoutResolver.ResolveNestedAgents(root);
+        diagnostics.AddRange(OrphanedTargetExports.Find(basePath, targets));
         var statuses = ExportStatus.Compute(load.Loaded, targets, layout, new RenderOptions(basePath, nestedAgents));
         var nestedPlan = nestedAgents && layout == ExportLayout.Split && targets.Contains("agents")
             ? NestedAgentsPlanner.Plan(load.Loaded.Context.Rules ?? [], basePath)
