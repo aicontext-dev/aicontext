@@ -134,6 +134,28 @@ public sealed class DiagnosticCodeTests : IDisposable
     }
 
     [Fact]
+    public void Validate_WhitespaceProjectName_IsNotAlsoReportedAsASchemaViolation()
+    {
+        WriteContext("""{ "$schema": "https://aicontext.dev/schema/v1/context.schema.json", "specVersion": "0.1.0", "project": { "name": "\t \n" } }""");
+
+        var diagnostics = Validate();
+
+        Assert.Single(diagnostics, d => d.IsError);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCodes.SchemaViolation);
+    }
+
+    [Fact]
+    public void Validate_EmptyProjectName_ReportsOnlyTheSchemaViolation()
+    {
+        WriteContext("""{ "$schema": "https://aicontext.dev/schema/v1/context.schema.json", "specVersion": "0.1.0", "project": { "name": "" } }""");
+
+        var diagnostics = Validate();
+
+        Assert.Equal(".aicontext/context.json#/project/name", Single(diagnostics, DiagnosticCodes.SchemaViolation).Location);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCodes.ProjectNameWhitespace);
+    }
+
+    [Fact]
     public void Validate_DefaultTargetNotInTargets_ReportsAIC1006()
     {
         WriteContext("""{ "$schema": "https://aicontext.dev/schema/v1/context.schema.json", "specVersion": "0.1.0", "project": { "name": "sample" }, "exports": { "targets": ["agents"], "defaultTarget": "claude" } }""");

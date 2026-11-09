@@ -91,6 +91,77 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void Manifest_EveryCaseNamesASpecSectionThatExists()
+    {
+        var headings = ReadSpecHeadings();
+        using var manifest = ReadManifest();
+
+        foreach (var testCase in manifest.RootElement.GetProperty("cases").EnumerateArray())
+        {
+            var file = testCase.GetProperty("file").GetString()!;
+            Assert.True(testCase.TryGetProperty("spec", out var spec), $"{file} does not name a SPEC section.");
+            Assert.Contains(spec.GetString()!, headings);
+        }
+    }
+
+    [Fact]
+    public void Manifest_BeyondSchemaCasesAreInvalidOnes()
+    {
+        using var manifest = ReadManifest();
+
+        foreach (var testCase in manifest.RootElement.GetProperty("cases").EnumerateArray()
+                     .Where(c => c.TryGetProperty("beyondSchema", out var beyond) && beyond.GetBoolean()))
+        {
+            Assert.False(testCase.GetProperty("valid").GetBoolean());
+            Assert.Equal("5.2", testCase.GetProperty("spec").GetString());
+        }
+    }
+
+    // Drift guard: a property the schema defines must be described in the property table of SPEC 5.1.
+    [Fact]
+    public void Spec_DescribesEveryPropertyOfTheSchema()
+    {
+        var spec = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "spec", "SPEC.md"));
+        using var schema = JsonDocument.Parse(ContextSchema.ReadText());
+        var properties = schema.RootElement.GetProperty("properties");
+
+        var paths = new List<string>();
+        foreach (var property in properties.EnumerateObject())
+        {
+            if (property.Value.TryGetProperty("properties", out var children))
+            {
+                paths.AddRange(children.EnumerateObject().Select(child => $"{property.Name}.{child.Name}"));
+            }
+            else
+            {
+                paths.Add(property.Name);
+            }
+        }
+
+        Assert.NotEmpty(paths);
+        foreach (var path in paths)
+        {
+            Assert.True(spec.Contains($"| `{path}` |", StringComparison.Ordinal), $"SPEC 5.1 does not describe '{path}'.");
+        }
+    }
+
+    // Section numbers of the headings in SPEC.md, for example "5.1" for "### 5.1 Properties" and "5" for "## 5. ...".
+    private static HashSet<string> ReadSpecHeadings()
+    {
+        var headings = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in File.ReadLines(Path.Combine(AppContext.BaseDirectory, "spec", "SPEC.md")))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(line, @"^#{2,4} (\d+(?:\.\d+)*)\.? ");
+            if (match.Success)
+            {
+                headings.Add(match.Groups[1].Value);
+            }
+        }
+
+        return headings;
+    }
+
+    [Fact]
     public void Manifest_EveryInvalidCaseNamesAPointer()
     {
         using var manifest = ReadManifest();

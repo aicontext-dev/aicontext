@@ -27,7 +27,9 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "Project name. Must contain at least one character that is not whitespace (SPEC 5.1)."
         },
         "description": {
           "type": "string",
@@ -70,6 +72,7 @@
         },
         "defaultTarget": {
           "type": "string",
+          "description": "Target used when none is requested. When exports.targets is present, must be 'all' or one of its entries; JSON Schema cannot express this, so implementations enforce it in addition (SPEC 5.2).",
           "enum": [
             "agents",
             "copilot",
@@ -99,7 +102,8 @@
       "properties": {
         "lastReviewed": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "Calendar date of the last review as YYYY-MM-DD. 'format' is only an annotation in JSON Schema by default; implementations must assert it (SPEC 5.2)."
         }
       }
     }

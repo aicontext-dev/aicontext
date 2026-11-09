@@ -4,6 +4,8 @@ Language-neutral examples for independent implementations of the [AIContext spec
 
 Status: the suite covers the draft format `0.1.0` and only `context.json` (SPEC 5 and 7). Cases for rule files, export output and the rules for newer versions will follow; see [GOVERNANCE.md section 6.2](../GOVERNANCE.md).
 
+The suite does not introduce rules of its own: every case follows from [SPEC 5.1 and 5.2](../SPEC.md#5-contextjson-format-v01-draft) and the [schema](../schema/v1/context.schema.json). If an independent implementation fails a case although it follows the specification and the schema, the specification is incomplete, and that is a bug to report here.
+
 ## Layout
 
 ```text
@@ -24,7 +26,9 @@ For every entry in `manifest.json`:
 2. If `valid` is `true`, the implementation MUST report no **error** for it (warnings, such as missing recommended files, are allowed).
 3. If `valid` is `false`, the implementation MUST report at least one **error** located at `pointer`, an [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901) JSON Pointer into the document (the empty string `""` is the document root).
 
-Only the location is part of the contract, not the wording or the code of the message, so each implementation can word its own diagnostics. Some invalid cases rely on rules that JSON Schema cannot express (for example `project.name` that is only whitespace, or `exports.defaultTarget` that is not listed in `exports.targets`); an implementation has to enforce them in addition to the schema.
+Every case names in `spec` the section of the specification it relies on (`5.1` for the properties, `5.2` for the rules a JSON Schema evaluator does not enforce by default). Cases marked `"beyondSchema": true` are accepted by a JSON Schema evaluator with default settings: the implementation has to enforce the rule itself, which is what SPEC 5.2 requires (for example `exports.defaultTarget` that is not listed in `exports.targets`, or `metadata.lastReviewed` when the evaluator does not assert `format`).
+
+Only the location is part of the contract, not the wording or the code of the message, so each implementation can word its own diagnostics.
 
 ## Changing the suite
 

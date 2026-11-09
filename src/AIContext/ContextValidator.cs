@@ -12,6 +12,7 @@ public sealed record ContextValidationResult(IReadOnlyList<Diagnostic> Diagnosti
 public static class ContextValidator
 {
     private const string ContextDirectoryName = ".aicontext";
+    private const string ProjectNamePointer = "/project/name";
 
     public static readonly IReadOnlyList<string> RecommendedFiles =
         ["architecture.md", "decisions.md", "constraints.md"];
@@ -59,6 +60,21 @@ public static class ContextValidator
             var issues = ContextSchema.Validate(root);
             foreach (var issue in issues)
             {
+                // A non-empty name without a non-whitespace character has its own stable code (AIC1005);
+                // an empty name is already reported by minLength.
+                if (issue is { Keyword: "pattern", Location: ProjectNamePointer })
+                {
+                    if (!issues.Any(i => i.Location == ProjectNamePointer && i.Keyword == "minLength"))
+                    {
+                        diagnostics.Add(Diagnostic.Error(
+                            DiagnosticCodes.ProjectNameWhitespace,
+                            "project.name must not be whitespace only.",
+                            $"{contextLocation}#{ProjectNamePointer}"));
+                    }
+
+                    continue;
+                }
+
                 var location = string.IsNullOrEmpty(issue.Location) ? "(root)" : issue.Location;
                 diagnostics.Add(Diagnostic.Error(
                     DiagnosticCodes.SchemaViolation,
@@ -127,17 +143,6 @@ public static class ContextValidator
                 DiagnosticCodes.SchemaUrlMismatch,
                 $"$schema should be '{canonicalSchemaUrl}'.",
                 $"{location}#/$schema"));
-        }
-
-        if (root.TryGetProperty("project", out var project) &&
-            TryGetString(project, "name", out var projectName) &&
-            projectName.Length > 0 &&
-            string.IsNullOrWhiteSpace(projectName))
-        {
-            diagnostics.Add(Diagnostic.Error(
-                DiagnosticCodes.ProjectNameWhitespace,
-                "project.name must not be whitespace only.",
-                $"{location}#/project/name"));
         }
 
         if (!root.TryGetProperty("exports", out var exports) || exports.ValueKind != JsonValueKind.Object)

@@ -292,19 +292,19 @@ Extended example:
 |---|---|---|
 | `$schema` | no (recommended) | schema URL; your editor can use it for completion and checking |
 | `specVersion` | **yes** | format version; currently always `"0.1.0"` (this is the version of the format, not of the tool) |
-| `project.name` | **yes** | project name (non-empty) |
+| `project.name` | **yes** | project name (at least one character that is not whitespace) |
 | `project.description` | no | one-line description |
 | `project.primaryLanguage` | no | main language |
 | `project.stack` | no | list of technologies (no duplicates) |
 | `exports.targets` | no | which tools are generated for with `--target all` |
-| `exports.defaultTarget` | no | `all` or one of `targets`; used by `export` when `--target` is not given (`--target` always wins). `all` = the targets from `exports.targets`; a single target = only that target |
+| `exports.defaultTarget` | no | `all` or one of `targets` (when `targets` is set); used by `export` when `--target` is not given (`--target` always wins). `all` = the targets from `exports.targets`; a single target = only that target |
 | `exports.layout` | no | `single` (default) or `split` (chapter 7) |
 | `exports.nestedAgents` | no | `true` = nested `AGENTS.md` (chapter 8; only with `split`) |
-| `metadata.lastReviewed` | no | date the content was last reviewed, `YYYY-MM-DD` |
+| `metadata.lastReviewed` | no | date the content was last reviewed, `YYYY-MM-DD` (a real calendar date) |
 
 Allowed target values: `agents`, `copilot`, `claude`, `cursor`, `windsurf`, `devin`, `aider`.
 
-Unknown fields are not allowed (the tool reports them as errors) – this protects against typos.
+Unknown fields are not allowed (the tool reports them as errors) – this protects against typos. The normative description of every field is [SPEC 5.1 and 5.2](https://github.com/aicontext-dev/aicontext/blob/main/SPEC.md#5-contextjson-format-v01-draft).
 
 ### Schema in the editor
 
