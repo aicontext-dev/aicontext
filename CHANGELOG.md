@@ -6,6 +6,10 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-09
+
+This release closes the gaps found while testing 0.5.0. It makes the export safer when a plan is applied later or a link points into another project, warns about leftovers of dropped targets, states the rules of `context.json` in the specification itself, and brings the documentation in line with what the tools really do (Aider and Copilot need a step of their own). Nothing changes the format: `specVersion` stays `0.1.0` and no `context.json` that was valid before is rejected. Library users should read the compatibility note at the end of **Changed**.
+
 ### Fixed
 
 - **`ExportService.Apply` refuses a plan that went stale.** It used to write a previously prepared plan without looking at the disk again. A hand-written file created after planning was overwritten without `--force`, and a directory replaced by a junction after planning let the old plan write outside the project (both reproduced). `Apply` now verifies every file before writing anything: the path must still resolve inside the project, and the file must still be in the state it was planned for (content hash; a file that did not exist must still not exist). New files are created exclusively. A stale plan is reported as the new error `AIC4103` (or `AIC4102` for a path that now leaves the project), nothing is written, and `ExportResult` carries the diagnostics (`Diagnostics`, `HasErrors`); the CLI prints them and exits with 1. The short gap between the last check and the write of an existing file remains and is documented in D12. Library: `ExportFilePlan.ExistingHash`, `StaleExportPlanException`, `DiagnosticCodes.StaleExportPlan`. Most relevant for editor integrations that show a plan before applying it; no change for normal CLI use. SPEC 6.3 now says that an implementation which plans first and writes later SHOULD verify again before writing (a clarification; no change to the format or to `specVersion`).
@@ -28,6 +32,7 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 - **`validate --strict` now fails for a project that still contains starter placeholders.** A freshly initialized extended project used to pass `validate --strict` as the Extended profile although its files said `TODO`, and `export` sent those stubs to AI tools as real context. The profiles stay structural, a plain `validate` still passes (exit 0), and only `--strict` turns the warning into an error. The standalone-binary smoke test now expects exactly this.
 - SPEC 7 and 8.2 state that placeholder detection is an optional heuristic and that the profiles describe structure only. No change to the format or to `specVersion`.
 - GOVERNANCE 6.1 and 6.2 document the draft-period exception to the compatibility commitment (additive changes within `0.1.0`, as already described in SPEC 9.1) and what the maintainers plan to decide before the first stable release (immutable schema versions, how an implementation reacts to newer documents, the conformance suite). SPEC 14 links to the suite. No change to the format or to `specVersion`.
+- **Compatibility note for library users.** `ExportFilePlan` gained the optional constructor parameters `ExistingHash` and `ReasonCode`, `SchemaIssue` gained the optional `Keyword`, and `ExportResult` gained `Diagnostics` and `HasErrors`. Source code keeps compiling, but a program built against 0.5.0 has to be recompiled. `ExportService.Apply` can now return a result with errors (stale or unsafe plan) instead of always succeeding: check `HasErrors`. Plans built by hand without `ExistingHash` are treated as stale when the file exists.
 
 ## [0.5.0] - 2026-11-08
 

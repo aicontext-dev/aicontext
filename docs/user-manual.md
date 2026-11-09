@@ -1,6 +1,6 @@
 # AIContext – User Manual
 
-> Applies to version `0.5.0`.
+> Applies to version `0.6.0`.
 
 ---
 
