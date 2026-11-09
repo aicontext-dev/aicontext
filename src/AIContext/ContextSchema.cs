@@ -3,7 +3,8 @@ using Json.Schema;
 
 namespace AIContext;
 
-public sealed record SchemaIssue(string Location, string Message);
+// Keyword is the JSON Schema keyword that failed (for example "pattern"); empty for an unknown property.
+public sealed record SchemaIssue(string Location, string Message, string Keyword = "");
 
 public static class ContextSchema
 {
@@ -57,7 +58,7 @@ public static class ContextSchema
                 }
 
                 var message = error.Key.Length == 0 ? "unknown property is not allowed." : error.Value;
-                issues.Add(new SchemaIssue(detail.InstanceLocation.ToString(), message));
+                issues.Add(new SchemaIssue(detail.InstanceLocation.ToString(), message, error.Key));
             }
         }
 

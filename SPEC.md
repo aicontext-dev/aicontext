@@ -157,6 +157,35 @@ Extended example:
 }
 ```
 
+### 5.1 Properties
+
+`context.json` MUST be a JSON object. The properties below are the only ones allowed (in 0.1.0 an unknown property, at any level, is an error; this protects against typos). Unless stated otherwise a string MUST NOT be empty.
+
+| Property | Type | Required | Rule |
+|----------|------|----------|------|
+| `$schema` | string (URI) | no | SHOULD be the published schema URL; implementations SHOULD warn when it is missing or different |
+| `specVersion` | string | **yes** | MUST be a specification version this document defines; `0.1.0` is the only one in this version |
+| `project.name` | string | **yes** | MUST contain at least one character that is not whitespace |
+| `project.description` | string | no | |
+| `project.primaryLanguage` | string | no | |
+| `project.stack` | array of strings | no | entries MUST be unique |
+| `exports.targets` | array of strings | no | at least one entry; entries MUST be unique and MUST be target names from 6.1 |
+| `exports.defaultTarget` | string | no | MUST be `all` or a target name from 6.1; when `exports.targets` is present it MUST also be `all` or one of its entries |
+| `exports.layout` | string | no | `single` or `split` (6.4) |
+| `exports.nestedAgents` | boolean | no | see 6.4 |
+| `metadata.lastReviewed` | string | no | a calendar date in the form `YYYY-MM-DD` (an RFC 3339 `full-date`); `2026-02-30` is not a date |
+
+`project`, `exports` and `metadata` are objects; `project` is required.
+
+### 5.2 Relation to the JSON Schema
+
+The [published schema](./schema/v1/context.schema.json) expresses the structure in 5.1 and is the normative form of it. Two rules need more than a schema evaluator does by default, and an implementation MUST enforce them in addition (section 7):
+
+1. `exports.defaultTarget` is listed in `exports.targets` (or is `all`). JSON Schema cannot compare a value with another property's entries.
+2. `metadata.lastReviewed` is a date. The schema declares `"format": "date"`, which JSON Schema treats as an annotation unless the evaluator is told to assert formats; the implementation MUST turn format assertion on, or check the date itself.
+
+The [conformance suite](./conformance/README.md) checks exactly the rules in 5.1 and 5.2: every case names the section it relies on.
+
 ## 6. Export model
 
 `.aicontext/` is canonical. Generated tool files are derived artifacts.
@@ -223,7 +252,7 @@ Generated rule files MUST be named with the `aicontext-` prefix, so they never c
 Validation is divided into three levels:
 
 1. **Structural** (MUST): required files exist and are readable.
-2. **Schema** (MUST): `context.json` is valid against declared schema.
+2. **Schema** (MUST): `context.json` is valid against declared schema and satisfies the rules in 5.1 and 5.2.
 3. **Quality** (SHOULD): recommended files are non-empty and materially useful.
 
 Recommended-file absence is not a hard spec error in v0.1, but MUST be surfaced as warnings. Implementations SHOULD also warn about recommended files that exist but are empty. Implementations MAY report obvious placeholder text in context files (for example `TODO: describe ...` or `**Tech stack:** TODO`) as warnings, so that a project made of starter stubs is not mistaken for useful content. Such a check is a heuristic and cannot tell whether the remaining content is useful or up to date.
@@ -239,7 +268,7 @@ Export SHOULD apply the same checks: an implementation SHOULD NOT generate files
 A repository is Core-compliant if:
 
 - `.aicontext/README.md` exists and is non-empty
-- `.aicontext/context.json` exists and passes schema validation
+- `.aicontext/context.json` exists and passes schema validation (7)
 
 ### 8.2 Extended profile
 
