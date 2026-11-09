@@ -255,6 +255,15 @@ public sealed class CliApp
         }
 
         var result = ExportService.Apply(plan);
+        if (result.HasErrors)
+        {
+            WriteErrors(result.Diagnostics);
+            _err.WriteLine(result.Changed == 0
+                ? "No files were written."
+                : $"{result.Changed} file(s) were already written. Run 'aicontext export' again.");
+            return 1;
+        }
+
         _out.WriteLine($"Export completed ({result.Changed} changed, {result.Unchanged} unchanged).");
         return 0;
     }

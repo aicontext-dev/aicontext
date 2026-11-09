@@ -6,6 +6,10 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ExportService.Apply` refuses a plan that went stale.** It used to write a previously prepared plan without looking at the disk again. A hand-written file created after planning was overwritten without `--force`, and a directory replaced by a junction after planning let the old plan write outside the project (both reproduced). `Apply` now verifies every file before writing anything: the path must still resolve inside the project, and the file must still be in the state it was planned for (content hash; a file that did not exist must still not exist). New files are created exclusively. A stale plan is reported as the new error `AIC4103` (or `AIC4102` for a path that now leaves the project), nothing is written, and `ExportResult` carries the diagnostics (`Diagnostics`, `HasErrors`); the CLI prints them and exits with 1. The short gap between the last check and the write of an existing file remains and is documented in D12. Library: `ExportFilePlan.ExistingHash`, `StaleExportPlanException`, `DiagnosticCodes.StaleExportPlan`. Most relevant for editor integrations that show a plan before applying it; no change for normal CLI use. SPEC 6.3 now says that an implementation which plans first and writes later SHOULD verify again before writing (a clarification; no change to the format or to `specVersion`).
+
 ### Added
 
 - **`aicontext status` shows overlap between exported files.** Some tools read several of the exported files and load them together (Copilot in VS Code combines `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md`), so the per-target table understated the real always-on context. `status` now adds an "Overlap" section with the summed always-on size for such tools (Copilot, Cursor, Devin), built from a small table taken from the vendors' documentation and labelled as an estimate. It is informational only, not a `validate` warning. Library: `ToolOverlaps`, `ToolOverlap`, `StatusReport.Overlaps`.

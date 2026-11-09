@@ -239,6 +239,91 @@ public sealed class ExportServiceTests : IDisposable
     }
 
     [Fact]
+    public void Apply_FileCreatedAfterPlanning_RefusesAndKeepsTheHandWrittenFile()
+    {
+        var plan = Plan("agents");
+        File.WriteAllText(InProject("AGENTS.md"), "hand written");
+
+        var result = ExportService.Apply(plan);
+
+        var problem = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.StaleExportPlan, problem.Code);
+        Assert.Equal("AGENTS.md", problem.Location);
+        Assert.Equal(0, result.Changed);
+        Assert.Equal("hand written", File.ReadAllText(InProject("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Apply_OneFileStale_WritesNoneOfTheOtherFiles()
+    {
+        var plan = Plan("all");
+        File.WriteAllText(InProject("CLAUDE.md"), "hand written");
+
+        var result = ExportService.Apply(plan);
+
+        Assert.True(result.HasErrors);
+        Assert.False(File.Exists(InProject("AGENTS.md")));
+        Assert.Equal("hand written", File.ReadAllText(InProject("CLAUDE.md")));
+    }
+
+    [Fact]
+    public void Apply_GeneratedFileEditedAfterPlanning_RefusesTheUpdate()
+    {
+        ExportService.Apply(Plan("agents"));
+        File.AppendAllText(InProject(".aicontext/README.md"), "\nA new line.\n");
+        var plan = Plan("agents");
+        Assert.Equal(ExportFileStatus.Updated, Assert.Single(plan.Files).Status);
+        File.WriteAllText(InProject("AGENTS.md"), "hand written");
+
+        var result = ExportService.Apply(plan);
+
+        Assert.Equal(DiagnosticCodes.StaleExportPlan, Assert.Single(result.Diagnostics).Code);
+        Assert.Equal("hand written", File.ReadAllText(InProject("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Apply_OrphanReplacedAfterPlanning_DoesNotDeleteIt()
+    {
+        var generated = $"<!-- {ContextExporter.GeneratedMarker} --target agents -->\n# Old\n";
+        Directory.CreateDirectory(InProject("docs"));
+        File.WriteAllText(InProject("docs/AGENTS.md"), generated);
+        var plan = Plan("agents");
+        Assert.Contains(plan.Files, f => f.Status == ExportFileStatus.Deleted);
+        File.WriteAllText(InProject("docs/AGENTS.md"), "hand written");
+
+        var result = ExportService.Apply(plan);
+
+        Assert.Equal(DiagnosticCodes.StaleExportPlan, Assert.Single(result.Diagnostics).Code);
+        Assert.Equal("hand written", File.ReadAllText(InProject("docs/AGENTS.md")));
+        Assert.False(File.Exists(InProject("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Apply_DirectoryBecameLinkOutsideAfterPlanning_WritesNothingOutside()
+    {
+        var plan = Plan("copilot");
+        Assert.False(plan.HasErrors);
+        TestLinks.CreateDirectoryLink(InProject(".github"), _outside);
+        _links.Add(InProject(".github"));
+
+        var result = ExportService.Apply(plan);
+
+        Assert.Equal(DiagnosticCodes.PathOutsideProject, Assert.Single(result.Diagnostics).Code);
+        Assert.Empty(Directory.GetFileSystemEntries(_outside));
+    }
+
+    [Fact]
+    public void Apply_FileAppearsJustBeforeWriting_ExclusiveCreateRefusesToOverwrite()
+    {
+        var path = InProject("AGENTS.md");
+        File.WriteAllText(path, "hand written");
+        var plan = new ExportFilePlan("agents", path, "generated", ExportFileStatus.Created);
+
+        Assert.Throws<StaleExportPlanException>(() => ExportWriter.Apply(plan));
+        Assert.Equal("hand written", File.ReadAllText(path));
+    }
+
+    [Fact]
     public void Status_ReportsLayoutTargetsAndSyncState()
     {
         WriteContext("""{ "targets": ["agents", "claude"], "layout": "split" }""");

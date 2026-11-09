@@ -59,6 +59,7 @@ public static class DiagnosticCodes
     public const string UnsupportedLayout = "AIC4005";
     public const string OverwriteConflict = "AIC4101";
     public const string PathOutsideProject = "AIC4102";
+    public const string StaleExportPlan = "AIC4103";
 }
 
 internal static class DiagnosticExtensions
