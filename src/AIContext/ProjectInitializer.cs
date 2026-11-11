@@ -9,7 +9,15 @@ public enum InitProfile
     Extended
 }
 
-public sealed record InitResult(IReadOnlyList<string> Created, IReadOnlyList<string> Conflicts);
+// Created are the files written. Conflicts are files that exist and were not overwritten (no --force, or a file that
+// appeared while init was running). Diagnostics explain a refusal: a destination that leaves the project, or enters a
+// separate one, through a link (AIC4102, AIC4104); nothing is written then.
+public sealed record InitResult(IReadOnlyList<string> Created, IReadOnlyList<string> Conflicts)
+{
+    public IReadOnlyList<Diagnostic> Diagnostics { get; init; } = [];
+
+    public bool HasErrors => Diagnostics.Any(d => d.IsError);
+}
 
 public static class ProjectInitializer
 {
@@ -105,7 +113,11 @@ public static class ProjectInitializer
         }
     }
 
-    // Writes nothing and reports the existing files when any target file exists and force is not set.
+    // Writes nothing and reports the problem when a destination leaves the project through a link (even with force:
+    // force allows overwriting, not writing somewhere else) or when any target file exists and force is not set.
+    // Every destination is checked, with the guard that protects export (D12), before the first file is written. A
+    // new file is created exclusively, so one that appeared after the check is never overwritten; init then stops
+    // and reports it as a conflict (files written before it stay).
     public static InitResult Initialize(
         string basePath,
         string projectName,
@@ -117,19 +129,45 @@ public static class ProjectInitializer
         var contextDirectory = Path.Combine(basePath, ".aicontext");
         var files = BuildFiles(contextDirectory, projectName, profile, schemaUrl, specVersion);
 
-        var conflicts = files.Keys.Where(File.Exists).ToList();
-        if (conflicts.Count > 0 && !force)
+        var guard = new ExportPathGuard(basePath);
+        var blocked = new List<Diagnostic>();
+        foreach (var path in files.Keys)
         {
-            return new InitResult([], conflicts);
+            if (guard.FindProblem(path) is { } problem)
+            {
+                var location = Path.GetRelativePath(basePath, path).Replace('\\', '/');
+                blocked.Add(ExportWriter.BlockedDiagnostic(path, problem.Description, problem.Code, location, "Init never writes"));
+            }
+        }
+
+        if (blocked.Count > 0)
+        {
+            return new InitResult([], []) { Diagnostics = blocked };
+        }
+
+        var existing = files.Keys.Where(File.Exists).ToList();
+        if (existing.Count > 0 && !force)
+        {
+            return new InitResult([], existing);
         }
 
         Directory.CreateDirectory(contextDirectory);
+        var created = new List<string>();
         foreach (var (path, content) in files)
         {
-            File.WriteAllText(path, content, new UTF8Encoding(false));
+            if (existing.Contains(path))
+            {
+                File.WriteAllText(path, content, new UTF8Encoding(false));
+            }
+            else if (!ExportWriter.TryCreateNew(path, content))
+            {
+                return new InitResult(created, [path]);
+            }
+
+            created.Add(path);
         }
 
-        return new InitResult(files.Keys.ToList(), []);
+        return new InitResult(created, []);
     }
 
     private static Dictionary<string, string> BuildFiles(

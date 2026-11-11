@@ -472,6 +472,29 @@ public sealed class CliAppTests : IDisposable
         Assert.Contains("blocked", result.Output);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Init_ContextDirectoryLinkedOutsideProject_FailsAndWritesNothing(bool force)
+    {
+        Directory.CreateDirectory(_outsidePath);
+        File.WriteAllText(Path.Combine(_outsidePath, "sentinel.txt"), "private");
+        var link = PathOf(".aicontext");
+        TestLinks.CreateDirectoryLink(link, _outsidePath);
+        _links.Add(link);
+
+        var result = force
+            ? Run("init", "--name", "demo", "--profile", "extended", "--force")
+            : Run("init", "--name", "demo", "--profile", "extended");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Init never writes outside the project", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.DoesNotContain("Created:", result.Output);
+        Assert.Equal(["sentinel.txt"], TestLinks.Entries(_outsidePath));
+        Assert.Equal("private", File.ReadAllText(Path.Combine(_outsidePath, "sentinel.txt")));
+    }
+
     [Fact]
     public void Export_UnsupportedSpecVersion_FailsAndWritesNothing()
     {

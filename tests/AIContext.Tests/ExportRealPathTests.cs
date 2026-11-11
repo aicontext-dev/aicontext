@@ -392,6 +392,6 @@ public sealed class ExportCaseInsensitivePathTests : RealPathFixture
         var plan = Export(_project);
 
         AssertRefused(plan, DiagnosticCodes.PathInSeparateProject);
-        Assert.Empty(TestLinks.Entries(Combine(_project, "pkg/child")).Where(name => name != ".aicontext"));
+        Assert.Equal([".aicontext"], TestLinks.Entries(Combine(_project, "pkg/child")));
     }
 }
