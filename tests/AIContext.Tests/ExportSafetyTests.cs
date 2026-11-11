@@ -194,17 +194,13 @@ public sealed class ExportSafetyTests : IDisposable
         Assert.Equal(ExportFileStatus.Created, Assert.Single(plans).Status);
     }
 
-    [Fact]
+    [LinkFact(LinkCapability.FileSymlink)]
     public void PlanTarget_ExistingFileIsLinkOutsideProject_IsBlockedWithoutTouchingTheTarget()
     {
         var secret = Path.Combine(_outside, "secret.md");
         File.WriteAllText(secret, "private");
         var link = InProject("AGENTS.md");
-        if (!TestLinks.TryCreateFileLink(link, secret))
-        {
-            return;
-        }
-
+        TestLinks.CreateFileLink(link, secret);
         _links.Add(link);
 
         var plans = Plan(Agents, Context());
@@ -214,16 +210,12 @@ public sealed class ExportSafetyTests : IDisposable
         Assert.Equal("private", File.ReadAllText(secret));
     }
 
-    [Fact]
+    [LinkFact(LinkCapability.FileSymlink)]
     public void PlanTarget_DanglingFileLinkLeavingProject_IsBlocked()
     {
         var target = Path.Combine(_outside, "not-yet.md");
         var link = InProject("AGENTS.md");
-        if (!TestLinks.TryCreateFileLink(link, target))
-        {
-            return;
-        }
-
+        TestLinks.CreateFileLink(link, target);
         _links.Add(link);
 
         var plans = Plan(Agents, Context());

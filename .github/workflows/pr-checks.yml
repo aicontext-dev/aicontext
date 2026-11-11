@@ -56,5 +56,9 @@ jobs:
             9.0.x
             10.0.x
 
+      # The link and case-sensitivity tests report themselves as skipped when the runner cannot provide what they
+      # need. These capabilities are required here, so a runner that lacks one fails the job instead of skipping.
       - name: Run AIContext tests
         run: dotnet test tests/AIContext.Tests/AIContext.Tests.csproj -c Release
+        env:
+          AICONTEXT_REQUIRE_LINK_CAPABILITIES: file-symlink,directory-symlink,case-sensitive-directory
