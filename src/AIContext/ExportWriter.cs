@@ -79,13 +79,7 @@ public static class ExportWriter
         switch (plan.Status)
         {
             case ExportFileStatus.Created:
-                Directory.CreateDirectory(System.IO.Path.GetDirectoryName(plan.Path)!);
-                try
-                {
-                    using var stream = new FileStream(plan.Path, FileMode.CreateNew, FileAccess.Write);
-                    stream.Write(new UTF8Encoding(false).GetBytes(plan.Content));
-                }
-                catch (IOException) when (File.Exists(plan.Path))
+                if (!TryCreateNew(plan.Path, plan.Content))
                 {
                     throw new StaleExportPlanException(plan.Path);
                 }
@@ -97,6 +91,24 @@ public static class ExportWriter
             case ExportFileStatus.Deleted:
                 File.Delete(plan.Path);
                 break;
+        }
+    }
+
+    // Creates a file that must not exist yet (FileMode.CreateNew, so whatever is there, even a dangling link, is
+    // never overwritten or followed). Returns false when the path is taken. Shared by export and init: every new
+    // file of aicontext is created this way.
+    internal static bool TryCreateNew(string path, string content)
+    {
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        try
+        {
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            stream.Write(new UTF8Encoding(false).GetBytes(content));
+            return true;
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            return false;
         }
     }
 
@@ -137,15 +149,21 @@ public static class ExportWriter
             plan.ExistingHash is null ? "was created after the export was planned" : "changed or was removed after the export was planned");
     }
 
-    internal static Diagnostic BlockedDiagnostic(string path, string? reason, string? code, string location) =>
+    // refusal starts the sentence that says what is never done; init words it for itself.
+    internal static Diagnostic BlockedDiagnostic(
+        string path,
+        string? reason,
+        string? code,
+        string location,
+        string refusal = "Export never writes or deletes") =>
         code == DiagnosticCodes.PathInSeparateProject
             ? Diagnostic.Error(
                 DiagnosticCodes.PathInSeparateProject,
-                $"{path} {reason}. Export never writes or deletes files of a separate project.",
+                $"{path} {reason}. {refusal} files of a separate project.",
                 location)
             : Diagnostic.Error(
                 DiagnosticCodes.PathOutsideProject,
-                $"{path} {reason}. Export never writes or deletes outside the project.",
+                $"{path} {reason}. {refusal} outside the project.",
                 location);
 
     internal static Diagnostic StalePlan(string path, string location, string reason) =>

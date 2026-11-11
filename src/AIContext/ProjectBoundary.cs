@@ -14,7 +14,9 @@ internal static class ProjectBoundary
 
     // The first directory on the way from basePath down to relativeDirectory (itself included) that is a separate
     // project, as a '/'-separated path relative to basePath; null when there is none. The path as written is
-    // checked first, then the real location with every link resolved (then relative to the real root).
+    // checked first, then the real location with every link resolved (then relative to the real root), under every
+    // reading of ".." in a link target (see LinkTargetDots), because a link can lead into the separate project under
+    // only one of them.
     public static string? FindNestedProject(string basePath, string relativeDirectory)
     {
         var current = basePath;
@@ -31,9 +33,18 @@ internal static class ProjectBoundary
 
         try
         {
-            return FindProjectBetween(
-                ExportPathGuard.ResolveRealPath(basePath),
-                ExportPathGuard.ResolveRealPath(ExportTarget.ResolveRelative(basePath, relativeDirectory)));
+            foreach (var dots in ExportPathGuard.Readings)
+            {
+                var found = FindProjectBetween(
+                    ExportPathGuard.ResolveRealPath(basePath, dots),
+                    ExportPathGuard.ResolveRealPath(ExportTarget.ResolveRelative(basePath, relativeDirectory), dots));
+                if (found is not null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

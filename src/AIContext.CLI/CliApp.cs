@@ -130,8 +130,20 @@ public sealed class CliApp
         }
 
         var result = ProjectInitializer.Initialize(basePath, projectName, profile, CanonicalSchemaUrl, ExpectedSpecVersion, force);
+        if (result.HasErrors)
+        {
+            WriteErrors(result.Diagnostics);
+            _err.WriteLine("No files were written.");
+            return 1;
+        }
+
         if (result.Conflicts.Count > 0)
         {
+            foreach (var created in result.Created)
+            {
+                _out.WriteLine($"Created: {created}");
+            }
+
             foreach (var conflict in result.Conflicts)
             {
                 _err.WriteLine($"File already exists: {conflict}. Use --force to overwrite.");

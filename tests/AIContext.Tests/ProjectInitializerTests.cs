@@ -9,19 +9,36 @@ public sealed class ProjectInitializerTests : IDisposable
     private const string SpecVersion = "0.1.0";
 
     private readonly string _basePath = Path.Combine(Path.GetTempPath(), "aicontext-tests-" + Guid.NewGuid().ToString("N"));
+    private readonly string _outside = Path.Combine(Path.GetTempPath(), "aicontext-tests-" + Guid.NewGuid().ToString("N"));
+    private readonly List<string> _links = [];
 
     public ProjectInitializerTests()
     {
         Directory.CreateDirectory(_basePath);
+        Directory.CreateDirectory(_outside);
     }
 
     public void Dispose()
     {
+        foreach (var link in Enumerable.Reverse(_links))
+        {
+            TestLinks.Remove(link);
+        }
+
         Directory.Delete(_basePath, recursive: true);
+        Directory.Delete(_outside, recursive: true);
     }
 
     private InitResult Init(InitProfile profile, bool force = false) =>
         ProjectInitializer.Initialize(_basePath, "demo", profile, SchemaUrl, SpecVersion, force);
+
+    private string CreateContextDirectory()
+    {
+        var contextDirectory = Path.Combine(_basePath, ".aicontext");
+        Directory.CreateDirectory(contextDirectory);
+        return contextDirectory;
+    }
+
 
     [Theory]
     [InlineData(null, InitProfile.Core, true)]
@@ -185,5 +202,188 @@ public sealed class ProjectInitializerTests : IDisposable
 
         Assert.Empty(result.Conflicts);
         Assert.Contains("# Project: demo", File.ReadAllText(readmePath));
+    }
+
+    [Fact]
+    public void Initialize_RunTwiceWithoutForce_ReportsEveryFileAsConflictAndChangesNothing()
+    {
+        var first = Init(InitProfile.Extended);
+        var before = first.Created.ToDictionary(path => path, File.ReadAllText);
+
+        var second = Init(InitProfile.Extended);
+
+        Assert.False(first.HasErrors);
+        Assert.False(second.HasErrors);
+        Assert.Empty(second.Created);
+        Assert.Equal(before.Keys, second.Conflicts);
+        Assert.All(before, file => Assert.Equal(file.Value, File.ReadAllText(file.Key)));
+    }
+
+    [Fact]
+    public void Initialize_RunTwiceWithForce_WritesTheSameFilesAgain()
+    {
+        var first = Init(InitProfile.Core);
+
+        var second = Init(InitProfile.Core, force: true);
+
+        Assert.False(second.HasErrors);
+        Assert.Empty(second.Conflicts);
+        Assert.Equal(first.Created, second.Created);
+    }
+
+    [Theory]
+    [InlineData(InitProfile.Core, false)]
+    [InlineData(InitProfile.Core, true)]
+    [InlineData(InitProfile.Extended, false)]
+    [InlineData(InitProfile.Extended, true)]
+    public void Initialize_ContextDirectoryIsLinkLeavingProject_WritesNothingOutside(InitProfile profile, bool force)
+    {
+        var sentinel = Path.Combine(_outside, "sentinel.txt");
+        File.WriteAllText(sentinel, "private");
+        var link = Path.Combine(_basePath, ".aicontext");
+        TestLinks.CreateDirectoryLink(link, _outside);
+        _links.Add(link);
+
+        var result = Init(profile, force);
+
+        Assert.Equal("private", File.ReadAllText(sentinel));
+        Assert.Equal(["sentinel.txt"], TestLinks.Entries(_outside));
+        AssertRefused(result, DiagnosticCodes.PathOutsideProject);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Initialize_ContextDirectoryIsLinkIntoSeparateProject_WritesNothingThere(bool force)
+    {
+        var child = Path.Combine(_basePath, "pkg", "child");
+        Directory.CreateDirectory(Path.Combine(child, ".aicontext"));
+        var link = Path.Combine(_basePath, ".aicontext");
+        TestLinks.CreateDirectoryLink(link, child);
+        _links.Add(link);
+
+        var result = Init(InitProfile.Core, force);
+
+        Assert.Equal([".aicontext"], TestLinks.Entries(child));
+        Assert.Empty(TestLinks.Entries(Path.Combine(child, ".aicontext")));
+        AssertRefused(result, DiagnosticCodes.PathInSeparateProject);
+    }
+
+    [Fact]
+    public void Initialize_ContextDirectoryIsLinkInsideProject_WritesThroughIt()
+    {
+        var shared = Path.Combine(_basePath, "shared-context");
+        Directory.CreateDirectory(shared);
+        var link = Path.Combine(_basePath, ".aicontext");
+        TestLinks.CreateDirectoryLink(link, shared);
+        _links.Add(link);
+
+        var result = Init(InitProfile.Core);
+
+        Assert.False(result.HasErrors);
+        Assert.Empty(result.Conflicts);
+        Assert.Equal(["README.md", "context.json"], TestLinks.Entries(shared));
+    }
+
+    [LinkFact(LinkCapability.DirectorySymlink)]
+    public void Initialize_ContextDirectoryIsDanglingLinkLeavingProject_CreatesNothingOutside()
+    {
+        var missing = Path.Combine(_outside, "missing");
+        var link = Path.Combine(_basePath, ".aicontext");
+        TestLinks.CreateDirectorySymlink(link, missing);
+        _links.Add(link);
+
+        var result = Init(InitProfile.Core);
+
+        Assert.False(Directory.Exists(missing));
+        Assert.Empty(TestLinks.Entries(_outside));
+        AssertRefused(result, DiagnosticCodes.PathOutsideProject);
+    }
+
+    // The file that is a link is the last one init writes, so a version that checked destinations one at a time while
+    // writing would already have created the others.
+    [LinkTheory(LinkCapability.FileSymlink)]
+    [InlineData(InitProfile.Core, "context.json", false)]
+    [InlineData(InitProfile.Core, "context.json", true)]
+    [InlineData(InitProfile.Extended, "constraints.md", false)]
+    [InlineData(InitProfile.Extended, "constraints.md", true)]
+    public void Initialize_ExistingFileLinkLeavingProject_KeepsTheExternalFileAndWritesNothing(InitProfile profile, string linked, bool force)
+    {
+        var secret = Path.Combine(_outside, "secret.md");
+        File.WriteAllText(secret, "private");
+        var contextDirectory = CreateContextDirectory();
+        var link = Path.Combine(contextDirectory, linked);
+        TestLinks.CreateFileLink(link, secret);
+        _links.Add(link);
+
+        var result = Init(profile, force);
+
+        Assert.Equal("private", File.ReadAllText(secret));
+        Assert.Equal([linked], TestLinks.Entries(contextDirectory));
+        AssertRefused(result, DiagnosticCodes.PathOutsideProject);
+    }
+
+    [LinkTheory(LinkCapability.FileSymlink)]
+    [InlineData(InitProfile.Core, "context.json", false)]
+    [InlineData(InitProfile.Core, "context.json", true)]
+    [InlineData(InitProfile.Extended, "constraints.md", false)]
+    [InlineData(InitProfile.Extended, "constraints.md", true)]
+    public void Initialize_DanglingFileLinkLeavingProject_DoesNotCreateTheExternalTarget(InitProfile profile, string linked, bool force)
+    {
+        var target = Path.Combine(_outside, "not-yet.md");
+        var contextDirectory = CreateContextDirectory();
+        var link = Path.Combine(contextDirectory, linked);
+        TestLinks.CreateFileLink(link, target);
+        _links.Add(link);
+
+        var result = Init(profile, force);
+
+        Assert.False(File.Exists(target));
+        Assert.Empty(TestLinks.Entries(_outside));
+        Assert.Equal([linked], TestLinks.Entries(contextDirectory));
+        AssertRefused(result, DiagnosticCodes.PathOutsideProject);
+    }
+
+    [LinkFact(LinkCapability.FileSymlink)]
+    public void Initialize_ExistingFileLinkInsideProjectWithoutForce_ReportsConflictAndKeepsItsTarget()
+    {
+        var notes = Path.Combine(_basePath, "notes.md");
+        File.WriteAllText(notes, "mine");
+        var contextDirectory = CreateContextDirectory();
+        var link = Path.Combine(contextDirectory, "README.md");
+        TestLinks.CreateFileLink(link, notes);
+        _links.Add(link);
+
+        var result = Init(InitProfile.Core);
+
+        Assert.False(result.HasErrors);
+        Assert.Equal([link], result.Conflicts);
+        Assert.Equal("mine", File.ReadAllText(notes));
+        Assert.False(File.Exists(Path.Combine(contextDirectory, "context.json")));
+    }
+
+    [LinkFact(LinkCapability.FileSymlink)]
+    public void Initialize_ExistingFileLinkInsideProjectWithForce_OverwritesItsTarget()
+    {
+        var notes = Path.Combine(_basePath, "notes.md");
+        File.WriteAllText(notes, "mine");
+        var contextDirectory = CreateContextDirectory();
+        var link = Path.Combine(contextDirectory, "README.md");
+        TestLinks.CreateFileLink(link, notes);
+        _links.Add(link);
+
+        var result = Init(InitProfile.Core, force: true);
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("# Project: demo", File.ReadAllText(notes));
+        Assert.True(File.Exists(Path.Combine(contextDirectory, "context.json")));
+    }
+
+    private static void AssertRefused(InitResult result, string code)
+    {
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.Created);
+        Assert.Empty(result.Conflicts);
+        Assert.Contains(result.Diagnostics, d => d.IsError && d.Code == code && d.Message.Contains("Init never writes"));
     }
 }

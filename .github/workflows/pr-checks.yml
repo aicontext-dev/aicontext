@@ -46,7 +46,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            capabilities: file-symlink,directory-symlink,case-sensitive-directory
+          - os: windows-latest
+            capabilities: file-symlink,directory-symlink,case-sensitive-directory,case-insensitive-directory
     steps:
       - uses: actions/checkout@v7
 
@@ -56,5 +60,10 @@ jobs:
             9.0.x
             10.0.x
 
+      # The link and case-sensitivity tests report themselves as skipped when the runner cannot provide what they
+      # need. The capabilities listed for the runner are required, so a runner that lacks one fails the job instead
+      # of skipping.
       - name: Run AIContext tests
         run: dotnet test tests/AIContext.Tests/AIContext.Tests.csproj -c Release
+        env:
+          AICONTEXT_REQUIRE_LINK_CAPABILITIES: ${{ matrix.capabilities }}
