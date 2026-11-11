@@ -35,9 +35,6 @@ public sealed class NestedAgentsTests : IDisposable
     [Theory]
     [InlineData("src/ui/**")]
     [InlineData("src/ui/**/*")]
-    [InlineData("src/ui/")]
-    [InlineData("src/ui")]
-    [InlineData("./src/ui/**")]
     public void Plan_MapsExactDirectoryScopes(string pattern)
     {
         var plan = NestedAgentsPlanner.Plan([Rule("ui", pattern)], _basePath);
@@ -56,8 +53,13 @@ public sealed class NestedAgentsTests : IDisposable
     [InlineData("/abs/**", "not a directory scope")]
     [InlineData("C:/Windows/**", "not a directory scope")]
     [InlineData("C:", "not a directory scope")]
+    // `src/ui` names a file and `src/ui/` is not a pattern (SPEC 4.4.2), so neither is the directory scope it was before.
+    [InlineData("src/ui", "not a directory scope")]
+    [InlineData("src/ui/", "not a directory scope")]
+    [InlineData("./src/ui/**", "not a directory scope")]
+    [InlineData("src/ui/button.tsx", "not a directory scope")]
     [InlineData("missing/**", "does not exist")]
-    [InlineData("src/ui/button.tsx", "is a file")]
+    [InlineData("src/ui/button.tsx/**", "is a file")]
     public void Plan_KeepsEverythingElseInTheRootFile(string pattern, string expectedReason)
     {
         var plan = NestedAgentsPlanner.Plan([Rule("r", pattern)], _basePath);

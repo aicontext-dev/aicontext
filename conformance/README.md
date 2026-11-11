@@ -2,16 +2,16 @@
 
 Language-neutral examples for independent implementations of the [AIContext specification](../SPEC.md). They define, by example, which `context.json` documents are valid and where an implementation has to report an error for the invalid ones. The reference implementation (`AIContext`) runs the suite in its own tests.
 
-Status: the suite covers the draft format `0.1.0`: `context.json` (SPEC 5 and 7) and rule files (SPEC 4.4 and 4.4.1). Cases for export output and the rules for newer versions will follow; see [GOVERNANCE.md section 6.2](../GOVERNANCE.md).
+Status: the suite covers the draft format `0.1.0`: `context.json` (SPEC 5 and 7), rule files (SPEC 4.4 and 4.4.1) and the path patterns of rules (SPEC 4.4.2). Cases for export output and the rules for newer versions will follow; see [GOVERNANCE.md section 6.2](../GOVERNANCE.md).
 
-The suite does not introduce rules of its own: every case follows from [SPEC 4.4, 4.4.1, 5.1 and 5.2](../SPEC.md) and the [schema](../schema/v1/context.schema.json). If an independent implementation fails a case although it follows the specification and the schema, the specification is incomplete, and that is a bug to report here.
+The suite does not introduce rules of its own: every case follows from [SPEC 4.4, 4.4.1, 4.4.2, 5.1 and 5.2](../SPEC.md) and the [schema](../schema/v1/context.schema.json). If an independent implementation fails a case although it follows the specification and the schema, the specification is incomplete, and that is a bug to report here.
 
 ## Layout
 
 ```text
 conformance/
   v0.1/
-    manifest.json      the list of cases with the expected outcome ("cases" and "ruleCases")
+    manifest.json      the list of cases with the expected outcome ("cases", "ruleCases", "globCases", "globInvalid")
     valid/             context.json documents that must be accepted
     invalid/           context.json documents that must be rejected
     rules/
@@ -43,7 +43,16 @@ For every entry in `ruleCases` of `manifest.json`:
 2. If `valid` is `true`, the implementation MUST report no **error**, and the project MUST have exactly one rule that matches `expect`: `kind` (`always`, `on-demand` or `scoped`), `paths` (the patterns, in order; an empty list for a rule that is not scoped) and `description` (the text, or `null` when the rule has none). When `warns` is `true`, the implementation SHOULD report a warning (it is a case about an unknown key).
 3. If `valid` is `false`, the implementation MUST report at least one **error** located at the rule file (`.aicontext/rules/<installAs>`), and the rule MUST NOT be part of the context. In particular it is never exported as an always-on rule, which would make it broader than its author wrote it.
 
-Every case names in `spec` the section it relies on (`4.4` for the names and the meaning of the keys, `4.4.1` for the syntax of the frontmatter). As for `context.json`, only the location is part of the contract, not the wording or the code of the message.
+Every case names in `spec` the section it relies on (`4.4` for the names and the meaning of the keys, `4.4.1` for the syntax of the frontmatter, `4.4.2` for the path patterns). As for `context.json`, only the location is part of the contract, not the wording or the code of the message.
+
+### Path patterns (`globFiles`, `globCases`, `globInvalid`)
+
+`globFiles` is a fixed set of file paths, relative to the project root and with `/` separators (it contains a root-level file called `src`, names that start with a dot, a directory with a comma in its name, and directories that differ only by letter case). For every entry of `globCases`:
+
+1. `pattern` is one item of `paths`, after the frontmatter was read (so a comma in it is part of the pattern, and a brace group is still in it).
+2. The implementation MUST match exactly the files listed in `matches` among the files of `globFiles`, and no other. An empty `matches` is a valid pattern that matches no file of the set.
+
+Every entry of `globInvalid` is an item that is not a pattern of SPEC 4.4.2. The implementation MUST NOT accept it: a rule that has it as an item of `paths` is invalid (an error at the rule file) and is never exported. The cases follow from SPEC 4.4.2 alone; translating a pattern for a tool is not part of the suite.
 
 ## Changing the suite
 

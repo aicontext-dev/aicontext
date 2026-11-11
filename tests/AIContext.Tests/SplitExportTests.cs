@@ -107,15 +107,38 @@ public sealed class SplitExportTests : IDisposable
     [InlineData("devin", ".devin/rules")]
     public void WindsurfAndDevin_Split_UseTriggerFrontmatter(string target, string directory)
     {
-        var outputs = Render(target);
+        var single = Context with
+        {
+            Rules =
+            [
+                new RuleDocument("ui", "UI conventions", ["src/ui/**"], "Use shared components."),
+                new RuleDocument("api", "API design", [], "Return JSON envelopes.")
+            ]
+        };
+
+        var outputs = ExportTargets.Find(target)!.Render(single, ExportLayout.Split);
 
         Assert.StartsWith("---\ntrigger: always_on\n---\n", outputs[0].Content);
 
         var ui = Content(outputs, $"{directory}/aicontext-ui.md");
-        Assert.StartsWith("---\ntrigger: glob\nglobs: \"src/ui/**,**/*.tsx\"\n", ui);
+        Assert.StartsWith("---\ntrigger: glob\nglobs: \"src/ui/**\"\n", ui);
 
         var api = Content(outputs, $"{directory}/aicontext-api.md");
         Assert.StartsWith("---\ntrigger: model_decision\ndescription: \"API design\"\n---\n", api);
+    }
+
+    [Theory]
+    [InlineData("windsurf", ".windsurf/rules")]
+    [InlineData("devin", ".devin/rules")]
+    public void WindsurfAndDevin_Split_DoNotWriteSeveralPatternsTheirDocumentationDoesNotShow(string target, string directory)
+    {
+        var outputs = Render(target);
+
+        var ui = outputs.Single(o => o.RelativePath == $"{directory}/aicontext-ui.md");
+        Assert.Equal(string.Empty, ui.Content);
+        Assert.Contains("documents a single pattern only", ui.Problem);
+        Assert.Contains("rule 'ui'", ui.Problem);
+        Assert.All(outputs.Where(o => o != ui), o => Assert.Null(o.Problem));
     }
 
     [Fact]
@@ -172,7 +195,7 @@ public sealed class SplitExportTests : IDisposable
             var second = Render(target.Name);
 
             Assert.Equal(first, second);
-            foreach (var output in first)
+            foreach (var output in first.Where(o => o.Problem is null))
             {
                 Assert.True(ExportWriter.IsGenerated(output.Content), output.RelativePath);
                 Assert.DoesNotContain("\r", output.Content);

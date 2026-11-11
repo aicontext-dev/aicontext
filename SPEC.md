@@ -110,7 +110,7 @@ Use the shared design-system components.
 
 | Key | Meaning |
 | --- | --- |
-| `paths` | Glob patterns (`/` separators). The rule applies when working with matching files. Accepts a list or a comma-separated string, and MUST contain at least one pattern. |
+| `paths` | Path patterns (4.4.2): relative to the project root, with `/` separators. The rule applies when working with matching files. Accepts a list or a comma-separated string, and MUST contain at least one pattern. |
 | `description` | One line explaining when the rule is relevant. MUST NOT be empty. |
 
 The rule kind follows from the frontmatter:
@@ -136,11 +136,32 @@ The frontmatter is a small subset of YAML, not YAML: text that is valid YAML is 
 
 How the known keys read a value:
 
-- `paths`: a flow list, a block list, or a scalar that is read as a comma-separated list. A scalar that is one quoted string is the text of the list (`paths: "src/**, lib/**"` has two items); several quoted items need the brackets (`["src/**", "lib/**"]`), and a bare list with a quoted item is an error. Empty items are ignored (`[a, , b]` and `a,,b` have the items `a` and `b`). At least one item MUST remain, otherwise the rule is invalid. Items MUST use `/` as the separator.
+- `paths`: a flow list, a block list, or a scalar that is read as a comma-separated list. A scalar that is one quoted string is the text of the list (`paths: "src/**, lib/**"` has two items); several quoted items need the brackets (`["src/**", "lib/**"]`), and a bare list with a quoted item is an error. Empty items are ignored (`[a, , b]` and `a,,b` have the items `a` and `b`). At least one item MUST remain, otherwise the rule is invalid. Every item MUST be a pattern of 4.4.2, which includes using `/` as the separator; a rule with an item that is not is invalid.
 - `description`: one scalar. A list or a nested value is an error, and so is an empty value.
 - Any other key: not read, only warned about.
 
 The [conformance suite](./conformance/README.md) lists rule files for these cases with the outcome an implementation has to produce.
+
+#### 4.4.2 Path patterns
+
+Tools read the same pattern text in different ways: `*.py` is the root-level files for one tool and the files at any depth for another, a comma separates patterns in some formats and is an ordinary character in others, and `{ts,tsx}` or `[id]` are syntax for some tools and plain text for others. A rule that has to apply to the same files in every tool needs one meaning that does not depend on the tool, and exporters translate it. This section defines that meaning for the items of `paths`: each item of the list, after the frontmatter was read as 4.4.1 says, so a comma inside an item is part of the pattern.
+
+**Meaning.** A pattern is relative to the project root and has to match the whole path of a file, written with `/` separators. The path and the pattern are split into segments at `/`.
+
+- A segment without `*` matches only a segment with the same text, and letter case is significant. A pattern without `/` is a single segment, so it matches root-level files only: `*.ts` matches `app.ts` and not `src/app.ts`, and `Makefile` matches the file `Makefile` and not `docs/Makefile`. Write `**/*.ts` for files at any depth.
+- `*` inside a segment matches any run of characters, including none, but never a `/`. It also matches names that start with a dot: `*` matches `.env`.
+- A segment that is exactly `**` matches directories. In the middle or at the start of a pattern it matches zero or more of them (`src/**/*.ts` matches `src/app.ts` and `src/a/b/app.ts`, and `**/*.ts` matches `app.ts`). As the last segment it matches one or more segments, that is everything below the directory in front of it (`src/**` matches `src/a.ts` and `src/a/b.ts`, and does not match a file called `src`). `**` MUST NOT be part of a longer segment (`a**b`), and `**` alone is not a pattern: write `**/*` for every file, or leave `paths` out to make the rule always on.
+- `{a,b}` is a shorthand for separate patterns, one for each alternative: `src/**/*.{ts,tsx}` stands for `src/**/*.ts` and `src/**/*.tsx`. A pattern may have several groups, which are expanded in turn, and the expansion MUST NOT produce more than 64 patterns. A group has at least two alternatives, none of them empty or with a space around it, and groups MUST NOT be nested.
+- Every other character stands for itself. In particular a comma is an ordinary character in an item that came from a list: `["src/a,b/**"]` is one pattern, which matches `src/a,b/x.ts`. An unquoted comma-separated value is split into items first (4.4.1).
+
+**Reserved syntax.** A pattern MUST NOT contain `?`, `[`, `]`, `(`, `)`, `!` or `\`, MUST NOT start or end with `/`, and MUST NOT have an empty segment (`a//b`) or a `.` or `..` segment. Tools read these as glob syntax or as paths in different ways, and this version defines no way to write them literally, so they are not patterns. Use `*` for the part of a name that has to stay open. A rule with an item that is not a pattern is invalid (4.4): an implementation MUST report an error and MUST NOT export the rule, in particular not as an always-on rule and not with the item changed.
+
+The [conformance suite](./conformance/README.md) lists a fixed set of file paths and, for each supported pattern, exactly the files it matches, and the items that are not patterns.
+
+**Translation.** An exporter MUST write a pattern in a tool's own format only in a form that the tool is documented to read as this section defines it. Where the tool reads the same text differently, the exporter writes the form that means the same (Claude reads `*.md` at any depth, so a root-level pattern is written `/*.md`), and a brace group is expanded before anything is written, so no tool has to know about it. Where no such form is documented (a tool whose list is one comma-separated text cannot carry a comma, and a tool whose documentation shows no more than one pattern cannot carry several), the export MUST be refused with an error that names the rule and the pattern, and nothing is written. The exporter MUST NOT write the pattern as it is, and MUST NOT move the rule into a file that applies to the whole project. This differs from the fallbacks of 6.4: those keep content for which a tool has no mechanism (on-demand content, or scopes in a tool without scoping) and state the scope in text, while a tool that supports scopes is never given a rule with another scope than its author wrote. What each tool is documented to read is recorded in the user manual; it was checked against the vendors' documentation and not by running the tools.
+
+**Limits.** None of the tools the reference implementation exports to documents whether `*` and `**` match names that start with a dot or whether matching is case-sensitive, and a file system without case (the default on Windows and macOS) can make a tool match `src/Foo` with `src/foo`. This section defines both without checking them against the tools, so a pattern that has to reach a hidden directory SHOULD name it (`.github/**`).
+
 ## 5. `context.json` format (v0.1 draft)
 
 Minimum valid shape:
@@ -205,7 +226,7 @@ The [published schema](./schema/v1/context.schema.json) expresses the structure 
 1. `exports.defaultTarget` is listed in `exports.targets` (or is `all`). JSON Schema cannot compare a value with another property's entries.
 2. `metadata.lastReviewed` is a date. The schema declares `"format": "date"`, which JSON Schema treats as an annotation unless the evaluator is told to assert formats; the implementation MUST turn format assertion on, or check the date itself.
 
-The [conformance suite](./conformance/README.md) checks the rules in 5.1 and 5.2 for `context.json`, and the rule files of 4.4 and 4.4.1: every case names the section it relies on.
+The [conformance suite](./conformance/README.md) checks the rules in 5.1 and 5.2 for `context.json`, and the rule files of 4.4 and 4.4.1 and the path patterns of 4.4.2: every case names the section it relies on.
 
 ## 6. Export model
 
@@ -258,11 +279,11 @@ In the split layout, always-on content (`README.md`, `constraints.md`, always-on
 | Windsurf, Devin | `aicontext-<name>.md` with `trigger: glob` and `globs` | `trigger: model_decision` with `description` |
 | Agents, Aider | no scoping; rules are rendered as sections in the single file | kept in the single file |
 
-Content is never dropped: where a tool cannot express a scope, the content is kept in the main file, with the scope stated in text (for example `Applies to: src/ui/**`).
+Content is never dropped: where a tool has no mechanism for scoping (Agents and Aider, and every tool in the single layout), the content is kept in the main file, with the scope stated in text (for example `Applies to: src/ui/**`). A tool that does support scopes is treated differently: it never gets a rule with another scope than its author wrote. When a pattern cannot be written in such a tool's own format with the meaning of 4.4.2, the export is refused instead (4.4.2, Translation), and the rule is not moved into the main file.
 
 #### Nested `AGENTS.md` (optional)
 
-`AGENTS.md` has no scoping of its own, but tools that read it also read an `AGENTS.md` located in a subdirectory when working there. With `exports.nestedAgents: true` and the split layout, an implementation MAY write directory-scoped rules to `<directory>/AGENTS.md` instead of the root file. This applies only to rules whose every pattern is an exact directory scope (`<dir>/**`, `<dir>/**/*`, `<dir>/` or `<dir>`) and whose directories exist; all other rules stay in the root file. Implementations MUST NOT create directories for this purpose and SHOULD report which rules were kept in the root file and why. A directory that contains its own `.aicontext/` is a separate project: an implementation MUST NOT write nested files into it, map rules to it or remove files from it when exporting the enclosing project, including when it is reached through a symbolic link or directory junction. Orphaned generated nested files MAY be removed using the same header rule as other generated files, outside separate projects.
+`AGENTS.md` has no scoping of its own, but tools that read it also read an `AGENTS.md` located in a subdirectory when working there. With `exports.nestedAgents: true` and the split layout, an implementation MAY write directory-scoped rules to `<directory>/AGENTS.md` instead of the root file. This applies only to rules whose every pattern is an exact directory scope (`<dir>/**` or `<dir>/**/*`, the two spellings of everything below `<dir>`; `<dir>` names a file and `<dir>/` is not a pattern, see 4.4.2) and whose directories exist; all other rules stay in the root file. Implementations MUST NOT create directories for this purpose and SHOULD report which rules were kept in the root file and why. A directory that contains its own `.aicontext/` is a separate project: an implementation MUST NOT write nested files into it, map rules to it or remove files from it when exporting the enclosing project, including when it is reached through a symbolic link or directory junction. Orphaned generated nested files MAY be removed using the same header rule as other generated files, outside separate projects.
 
 Because several tools read both `AGENTS.md` and their own rule files, enabling `nestedAgents` together with other scoping targets (for example `cursor` or `copilot`) can make a tool see the same rule twice.
 
@@ -318,7 +339,7 @@ The specification and the reference tooling are versioned independently:
 - **Specification version** (`Version` in this file, `specVersion` in `context.json`, the schema under `schema/v1/`) identifies the format. It changes only when the format changes.
 - **Tool version** (the `AIContext` and `AIContext.CLI` packages and the standalone binaries) identifies a software release. It also changes for bug fixes and features that do not alter the format.
 
-While the specification is a draft (`0.x`), additions may be made within the current version and `specVersion` stays `0.1.0`. The first change that makes existing files invalid or changes their meaning bumps the specification version, and the schema is widened so that files declaring older supported versions remain valid.
+While the specification is a draft (`0.x`), additions may be made within the current version and `specVersion` stays `0.1.0`. The first change that makes existing files invalid or changes their meaning bumps the specification version, and the schema is widened so that files declaring older supported versions remain valid. This concerns `context.json`, which declares the version. Rule files (4.4) carry no version of their own and are the part of the draft that is still being settled, so a change of what a rule file means is recorded in the table below and in the CHANGELOG, with migration examples, and does not bump `specVersion`.
 
 | Tool version | Specification version | Format changes introduced |
 |--------------|-----------------------|---------------------------|
@@ -327,6 +348,7 @@ While the specification is a draft (`0.x`), additions may be made within the cur
 | 0.4.0 | 0.1.0-draft | None; `exports.defaultTarget` semantics clarified (6.1) |
 | 0.5.0 | 0.1.0-draft | None; requirements clarified: no writes outside the project and separate projects (6.3, 6.4), export applies validation errors (7), the secret lint is a heuristic (10) |
 | 0.6.0 | 0.1.0-draft | None; requirements clarified: the properties of `context.json` and the rules beyond the schema (5.1, 5.2; the schema now also states that `project.name` has a non-whitespace character), a plan is verified again before writing (6.3), separate projects also behind links (6.4). No document that was valid before is rejected |
+| Unreleased | 0.1.0-draft | Rule files only (4.4, 4.4.1, 4.4.2); `context.json` and its schema do not change. The frontmatter is a strict subset with one reading (4.4.1), and the items of `paths` have one meaning in every tool (4.4.2), with a refused export instead of a changed scope (6.4). Rule files that were accepted before can be invalid now (an empty `paths` or `description`, a repeated key, a bad quote, a pattern outside 4.4.2), and a pattern without `/` means the root only for Claude too. See the CHANGELOG for the migration |
 
 ## 10. Security and privacy guidance
 
@@ -388,4 +410,4 @@ Planned command surface:
 
 This section is informative only; command behavior is defined by tooling implementation, not by the file format itself.
 
-Independent implementations can check their handling of `context.json` and of rule files against the language-neutral [conformance suite](./conformance/README.md), which lists valid and invalid documents and rule files and what an implementation has to produce.
+Independent implementations can check their handling of `context.json` and of rule files against the language-neutral [conformance suite](./conformance/README.md), which lists valid and invalid documents, rule files and path patterns and what an implementation has to produce.

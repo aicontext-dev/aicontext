@@ -206,6 +206,7 @@ public sealed class DiagnosticCodeTests : IDisposable
     [InlineData("ui.md", "---\ndescription: x\nBody.", DiagnosticCodes.InvalidFrontmatter)]
     [InlineData("ui.md", "---\ndescription: [a, b]\n---\nBody.", DiagnosticCodes.InvalidRuleDescription)]
     [InlineData("ui.md", "---\npaths: [src\\ui/**]\n---\nBody.", DiagnosticCodes.InvalidRulePathSeparator)]
+    [InlineData("ui.md", "---\npaths: [\"src/[ab]/**\"]\n---\nBody.", DiagnosticCodes.InvalidRulePathPattern)]
     [InlineData("ui.md", "---\npaths: []\n---\nBody.", DiagnosticCodes.EmptyFrontmatterValue)]
     [InlineData("ui.md", "---\ndescription:\n---\nBody.", DiagnosticCodes.EmptyFrontmatterValue)]
     public void Validate_InvalidRule_ReportsRuleErrorWithLocation(string fileName, string content, string expectedCode)

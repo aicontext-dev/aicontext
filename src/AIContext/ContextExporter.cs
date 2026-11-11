@@ -69,7 +69,18 @@ public static class ContextExporter
         foreach (var item in fileItems)
         {
             var path = $"{target.RuleDirectory}/{ExportTargets.GeneratedRulePrefix}{item.Id}{target.RuleExtension}";
-            outputs.Add(new ExportOutput(path, BuildRuleFile(target, hash, item)));
+            if (item.Kind != RuleKind.Scoped)
+            {
+                outputs.Add(new ExportOutput(path, BuildRuleFile(target, hash, item, [])));
+                continue;
+            }
+
+            // A scoped rule is written for a tool only with the scope its author wrote; otherwise nothing is written
+            // (not even a fallback into the main file, which would load it for the whole project).
+            var scope = ScopeTranslator.Translate(target, item.Id, item.Paths);
+            outputs.Add(scope.Problem is null
+                ? new ExportOutput(path, BuildRuleFile(target, hash, item, scope.Patterns))
+                : new ExportOutput(path, string.Empty, scope.Problem));
         }
 
         if (nested is not null)
@@ -221,10 +232,10 @@ public static class ContextExporter
         return builder.ToString().TrimEnd() + "\n";
     }
 
-    private static string BuildRuleFile(ExportTarget target, string hash, Item item)
+    private static string BuildRuleFile(ExportTarget target, string hash, Item item, IReadOnlyList<string> patterns)
     {
         var builder = new StringBuilder();
-        var globs = string.Join(',', item.Paths);
+        var globs = string.Join(',', patterns);
         var scoped = item.Kind == RuleKind.Scoped;
         var description = string.IsNullOrWhiteSpace(item.Description) ? null : item.Description;
 
@@ -255,7 +266,7 @@ public static class ContextExporter
                 break;
             case RuleStyle.Claude:
                 AppendLine(builder, "paths:");
-                foreach (var path in item.Paths)
+                foreach (var path in patterns)
                 {
                     AppendLine(builder, $"  - {Quote(path)}");
                 }

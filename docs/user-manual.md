@@ -589,7 +589,7 @@ paths: ["src/connectors/**"]
 | only `description` | **on-demand** | when the assistant decides it is relevant |
 | nothing (no header) | **always on** | always |
 
-`paths` can be a list or comma-separated text (`paths: src/ui/**, **/*.tsx`). Use `/` as the separator, also on Windows.
+`paths` can be a list or comma-separated text (`paths: src/ui/**, **/*.tsx`). Use `/` as the separator, also on Windows. What a pattern means, and what is not allowed in one, is in "Path patterns" below.
 
 File name rules: lowercase letters, digits, `-`, `_`, at least one character (for example `ui.md`, `api-v2.md`, `_team.md`). Reserved names: `architecture`, `decisions`, `patterns`, `constraints`, `glossary`, `project`.
 
@@ -611,6 +611,48 @@ The header is a small subset of YAML, not YAML. It is strict about the few thing
 | `Paths: src/**` | an unknown key as well (keys are case-sensitive): a warning, and the rule is **always on** |
 
 An indented or multi-line value under `paths` or `description` (`description: >`) is an error: a description is one line.
+
+### Path patterns: what `paths` means
+
+Tools read the same pattern text differently (`*.ts` is "root files only" for Copilot and Cursor and "any depth" for Claude, and a comma separates patterns in some formats). So that a rule applies to the same files in every tool, AIContext gives the items of `paths` **one meaning** ([SPEC 4.4.2](../SPEC.md)) and translates it for each tool, or refuses to export when it cannot do that faithfully.
+
+| Pattern | Matches |
+|---|---|
+| `*.ts` | `.ts` files in the **project root only** (not `src/app.ts`) |
+| `**/*.ts` | `.ts` files at any depth, the root included |
+| `Makefile` | the root-level file `Makefile` |
+| `src/*.ts` | `.ts` files directly in `src/` |
+| `src/**` | everything below `src/` at any depth |
+| `src/**/*.tsx` | `.tsx` files anywhere below `src/` (also directly in it) |
+| `tailwind.config.*` | `tailwind.config.js`, `tailwind.config.ts`, … |
+| `src/**/*.{ts,tsx}` | `.ts` and `.tsx` files below `src/`; a brace group is a shorthand that AIContext writes out as separate patterns (`src/**/*.ts`, `src/**/*.tsx`), at most 64 of them, one level, no empty alternative |
+| `["src/a,b/**"]` | one pattern: the directory whose name is `a,b` (a comma in an item of a list is an ordinary character) |
+
+Letter case is significant, and `*` and `**` also match names that start with a dot (`*` matches `.env`). None of the tools documents either, so to reach a hidden directory name it (`.github/**`).
+
+**Not allowed** (`AIC2008`, the rule is not exported): `**` alone (write `**/*`, or remove `paths` for an always-on rule), a leading or trailing `/` (`/src/**`, `src/`; write `src/**` for a directory), `./` or `..`, an empty segment (`a//b`), `**` inside a name (`a**b`), and the characters `? [ ] ( ) !`, which tools read as glob syntax in different ways (for `src/[id]/page.tsx` write `src/*/page.tsx`). Brace groups cannot be nested or empty.
+
+**What is written for each tool** (from the vendors' documentation, checked on 2026-11-11; the tools themselves were not run):
+
+| Tool | Format | A pattern without `/` (`*.ts`) | Several patterns | A comma in a pattern |
+|---|---|---|---|---|
+| Copilot (VS Code `applyTo`) | one comma-separated text | as it is (root only) | joined with commas | refused |
+| Cursor (`globs`) | one comma-separated text | as it is (root only) | joined with commas | refused |
+| Claude (`paths`) | YAML list | written as `/*.ts` (Claude reads `*.ts` at any depth) | list items | list item |
+| Windsurf, Devin (`globs`) | the documentation shows one pattern with a `/` only | refused | refused | refused |
+
+**Refused** means: `export` fails with `AIC4107`, names the rule, the pattern and the tool, and **writes nothing at all**. The rule is never moved into the always-on main file, because that would load a scoped rule for the whole project. This is different from the fallbacks above, which stay as they are: on-demand content has no scope to lose, and a tool without scopes (`agents`, `aider`, and every tool in the `single` layout) keeps the rule as a section with the text "Applies to: …". To get unblocked, rewrite the pattern, split a rule for Windsurf/Devin into one rule per pattern, or export only to the tools that can carry it (`--target`, or `exports.targets`). `aicontext status` shows such a target as `blocked` and prints the reason.
+
+**Migrating a rule you wrote before this was defined:**
+
+| Before | Now |
+|---|---|
+| `*.md` meant "any depth" in Claude only | write `**/*.md` for any depth (all tools), or keep `*.md` for the root only (Claude now gets `/*.md`) |
+| `src/**/*.{ts,tsx}` worked in Claude and broke in Copilot and Cursor (the comma split it) | works everywhere (written out as two patterns), except Windsurf and Devin (several patterns) |
+| `["src/a,b/**"]` was read as `src/a` and `b/**` by Copilot and Cursor | refused for them (`AIC4107`) and fine for Claude |
+| `**` as the pattern of "every file" | `**/*` |
+| `src/ui/` or `./src/ui/**` | `src/ui/**` |
+| `app/[id]/**` | `app/*/**` |
 
 ### Enabling it
 
@@ -636,7 +678,7 @@ or one-off `aicontext export --target all --layout split`.
 | Windsurf / Devin | `aicontext-<name>.md` (`trigger: glob`) | `trigger: model_decision` |
 | `agents`, `aider` | cannot split content – rules are sections in a single file with the text "Applies to: …" | – |
 
-**No content is lost:** where a tool does not know scopes, the text stays in the main file.
+**No content is lost, and no scope is widened:** where a tool has no scopes, the text stays in the main file with the scope stated as text. Where a tool has scopes but cannot carry a particular pattern, the export is refused instead (see "Path patterns").
 
 ### Savings
 
@@ -664,8 +706,8 @@ Example: a rule with `paths: services/billing/**` → file `services/billing/AGE
 
 Mapping rules (intentionally strict, so a rule never affects more or fewer files than you intended):
 
-- Works: `dir/**`, `dir/**/*`, `dir/`, `dir` – and the directory must exist. Directories are never created.
-- Does not work (the rule stays in the root `AGENTS.md`): `**/*.ts`, `src/ui/**/*.tsx`, a non-existent directory, a file path, a path outside the repository.
+- Works: `dir/**` and `dir/**/*` (everything below `dir`), and the directory must exist. Directories are never created.
+- Does not work (the rule stays in the root `AGENTS.md`): `dir` and `dir/` (a bare name is a file, and a trailing `/` is not a pattern), `**/*.ts`, `src/ui/**/*.tsx`, a non-existent directory, a file path, a path outside the repository.
 - If a rule has several patterns and even one cannot be mapped, the whole rule stays in the root.
 
 `aicontext status` lists what went where and why some rule stayed in the root:
@@ -896,6 +938,8 @@ Delete `.aicontext/`. The generated files (`AGENTS.md`, …) remain as ordinary 
 | `… is reserved for a built-in section` | the rule name is reserved | choose another name |
 | `… frontmatter is not closed with '---'` | the rule header has no closing `---` | add it |
 | `path '…' must use '/' as separator` | you used `\` in `paths` | replace it with `/` |
+| `path '…' is not a pattern the specification defines (SPEC 4.4.2): …` (`AIC2008`) | the pattern uses syntax this version does not define (`**` alone, a leading or trailing `/`, `./`, `..`, `? [ ] ( ) !`, a broken brace group) | rewrite it as the message says; "Path patterns" in chapter 7 has the allowed forms and a migration table |
+| `… cannot be generated: rule '…': pattern '…' … Nothing is written, because a scoped rule is never widened to the whole project.` (`AIC4107`), or `blocked` in `status` | the tool cannot be told this pattern with the meaning you wrote: a comma in a pattern for Copilot/Cursor/Windsurf/Devin, several patterns or a pattern without `/` for Windsurf/Devin | rewrite the pattern, split the rule (one pattern per rule) for Windsurf/Devin, or export without that tool (`--target`, `exports.targets`); see "Path patterns" in chapter 7 |
 | `'paths' is present but has no pattern` / `'description' is present but empty` (`AIC2007`) | `paths: []`, `paths:` or `description:` with no value | write the value, or remove the key (a rule without `paths` is on-demand or always on, which is a different rule) |
 | `duplicate key '…'`, `unsupported frontmatter line`, `the quote … is not closed`, `there is text after the closing quote` (`AIC2003`) | the header repeats a key, has a line that is not `key: value`, or has a quote that is not closed | fix the line the message names; see "What the header may contain" in chapter 7 |
 | A rule was not exported separately | `layout` is not `split`; or it is Copilot/Claude on-demand content (it stays in the main file) | check `aicontext status` |
@@ -933,6 +977,7 @@ Every error and warning of the library (and so of the CLI) carries a stable code
 | `AIC2005` | error | a rule path uses `\` instead of `/` |
 | `AIC2006` | error | a rule file, or the `rules/` directory, could not be read (locked by another program, no permission) |
 | `AIC2007` | error | `paths` or `description` is present but has no value (`paths: []`, `paths:`, `description:`); the rule is rejected, never exported as always-on |
+| `AIC2008` | error | an item of `paths` is not a pattern of SPEC 4.4.2 (`**` alone, a leading or trailing `/`, `.` or `..`, an empty segment, `? [ ] ( ) !`, a brace group that is nested, empty, unclosed or expands to more than 64 patterns); the rule is rejected and the message says why |
 | `AIC2101` | warning | a subdirectory of `rules/` is ignored |
 | `AIC2102` | warning | a file in `rules/` that is not `.md` is ignored |
 | `AIC2103` | warning | an unknown key in a rule header is ignored |
@@ -950,6 +995,7 @@ Every error and warning of the library (and so of the CLI) carries a stable code
 | `AIC4104` | error | an export would write or delete inside a separate project (a directory with its own `.aicontext/`) through a link, or `init` would write there |
 | `AIC4105` | error | the destination of a generated file is blocked by what is on disk: a directory where the file has to go, or a file where a directory is needed; nothing is written (`export`, `init`) |
 | `AIC4106` | error | a file could not be read, listed or written (locked, read-only, no permission, no space). Before the first write it blocks the whole run; during writing it stops it, and what was already written stays (`ExportResult.Written`, `InitResult.Created`) |
+| `AIC4107` | error | a scoped rule cannot be written for a tool with the scope its author wrote (a comma in a pattern for a tool whose list is comma-separated text, several patterns or a pattern without `/` for Windsurf/Devin); nothing is written and the rule is never moved into the main file (`export`, also `--dry-run` and `--check`; `status` shows the target as blocked; `validate` does not know the targets and does not report it) |
 | `AIC4201` | warning | a target is not exported any more (`exports.targets`), but files generated for it are still on disk (`export --target all`, `status`) |
 
 ---

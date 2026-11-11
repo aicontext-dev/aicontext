@@ -68,7 +68,7 @@ Any MAJOR change MUST include explicit migration guidance.
 
 ### 6.1 Draft period (0.x)
 
-Until the specification leaves draft status (its first stable release), the commitment above applies with one exception, which [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version) already describes: backward-compatible additions MAY be made within the current `specVersion`, and the table in that section records which tool version introduced which change. The schema does not allow unknown properties, so a validator from before such an addition rejects a newer document that uses it, while every document that was valid before stays valid. The first change that makes existing documents invalid or changes their meaning bumps `specVersion`.
+Until the specification leaves draft status (its first stable release), the commitment above applies with one exception, which [SPEC.md section 9.1](./SPEC.md#91-specification-version-vs-tool-version) already describes: backward-compatible additions MAY be made within the current `specVersion`, and the table in that section records which tool version introduced which change. The schema does not allow unknown properties, so a validator from before such an addition rejects a newer document that uses it, while every document that was valid before stays valid. The first change that makes existing documents invalid or changes their meaning bumps `specVersion`. This concerns `context.json`, the document that declares the version; rule files carry no version of their own, so a change of what a rule file means is recorded in the table of SPEC 9.1 and in the CHANGELOG, with migration examples.
 
 ### 6.2 Before the first stable release
 
