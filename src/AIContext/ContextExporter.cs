@@ -257,12 +257,10 @@ public static class ContextExporter
                 AppendLine(builder, "alwaysApply: false");
                 break;
             case RuleStyle.Copilot:
+                // `applyTo` alone declares the scope. The VS Code Local harness can load an instructions file by its
+                // `description`, separately from `applyTo` and not as a condition on it, so a description in the
+                // frontmatter would load a scoped rule for files outside its scope; it is kept as text in the body.
                 AppendLine(builder, $"applyTo: {Quote(globs)}");
-                if (description is not null)
-                {
-                    AppendLine(builder, $"description: {Quote(description)}");
-                }
-
                 break;
             case RuleStyle.Claude:
                 AppendLine(builder, "paths:");
@@ -292,6 +290,12 @@ public static class ContextExporter
         AppendHeader(builder, target.Name, hash);
         AppendLine(builder, $"# {item.Title}");
         AppendLine(builder, string.Empty);
+        if (target.Style == RuleStyle.Copilot && description is not null)
+        {
+            AppendLine(builder, $"Description: {NormalizeLineEndings(description).Trim()}");
+            AppendLine(builder, string.Empty);
+        }
+
         AppendLine(builder, item.Body);
 
         return builder.ToString().TrimEnd() + "\n";
