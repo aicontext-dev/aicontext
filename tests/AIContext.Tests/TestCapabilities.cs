@@ -10,7 +10,9 @@ public enum LinkCapability
     // Directory symbolic links with a relative target; Windows junctions cannot express them.
     DirectorySymlink,
     // A directory in which paths that differ only by letter case are different entries.
-    CaseSensitiveDirectory
+    CaseSensitiveDirectory,
+    // A directory in which paths that differ only by letter case are the same entry (the default on Windows and macOS).
+    CaseInsensitiveDirectory
 }
 
 // Probes the capabilities once per test run, in a temporary directory, without changing host settings.
@@ -26,6 +28,7 @@ internal static class TestCapabilities
         LinkCapability.FileSymlink => "file-symlink",
         LinkCapability.DirectorySymlink => "directory-symlink",
         LinkCapability.CaseSensitiveDirectory => "case-sensitive-directory",
+        LinkCapability.CaseInsensitiveDirectory => "case-insensitive-directory",
         _ => throw new ArgumentOutOfRangeException(nameof(capability))
     };
 
@@ -61,7 +64,8 @@ internal static class TestCapabilities
             {
                 [LinkCapability.FileSymlink] = ProbeFileSymlink(directory),
                 [LinkCapability.DirectorySymlink] = ProbeDirectorySymlink(directory),
-                [LinkCapability.CaseSensitiveDirectory] = ProbeCaseSensitiveDirectory(directory)
+                [LinkCapability.CaseSensitiveDirectory] = ProbeCaseSensitiveDirectory(directory),
+                [LinkCapability.CaseInsensitiveDirectory] = ProbeCaseInsensitiveDirectory(directory)
             };
         }
         finally
@@ -130,6 +134,16 @@ internal static class TestCapabilities
         return Directory.GetDirectories(probe).Length == 2
             ? null
             : "the temporary directory treats paths that differ only by letter case as the same";
+    }
+
+    // The default temporary directory, without making anything case-sensitive.
+    private static string? ProbeCaseInsensitiveDirectory(string directory)
+    {
+        var probe = Path.Combine(directory, "case-insensitive");
+        Directory.CreateDirectory(Path.Combine(probe, "a"));
+        return Directory.Exists(Path.Combine(probe, "A"))
+            ? null
+            : "the temporary directory distinguishes paths that differ only by letter case";
     }
 }
 
