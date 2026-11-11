@@ -371,7 +371,8 @@ public sealed class CliApp
         var layout = report.Layout;
         var statuses = report.Targets;
 
-        _out.WriteLine($"Project: {context.ProjectName}");
+        // What is shown here comes from the files of .aicontext/; text that looks like a secret is not repeated.
+        _out.WriteLine($"Project: {SecretScanner.Redact(context.ProjectName)}");
         _out.WriteLine($"Layout:  {layout.ToString().ToLowerInvariant()}");
 
         var rules = context.Rules ?? [];
@@ -382,8 +383,8 @@ public sealed class CliApp
             {
                 var scope = rule.Kind switch
                 {
-                    RuleKind.Scoped => $"scoped    {string.Join(", ", rule.Paths)}",
-                    RuleKind.OnDemand => $"on-demand {rule.Description}",
+                    RuleKind.Scoped => $"scoped    {string.Join(", ", rule.Paths.Select(SecretScanner.Redact))}",
+                    RuleKind.OnDemand => $"on-demand {SecretScanner.Redact(rule.Description ?? string.Empty)}",
                     _ => "always on"
                 };
                 _out.WriteLine($"  {rule.Name,-16} {scope}");

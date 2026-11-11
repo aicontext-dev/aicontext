@@ -38,7 +38,14 @@ internal sealed class ExportPathGuard
     }
 
     // Null when the path is safe; otherwise why it must not be touched.
-    public PathProblem? FindProblem(string path)
+    public PathProblem? FindProblem(string path) => Find(path, containmentOnly: false);
+
+    // For the files that are read as the context of the project: null when the real location of the path, with every
+    // link resolved, is inside the real project root. Unlike FindProblem it does not care about separate projects, and
+    // only link targets are looked at; nothing is opened.
+    public PathProblem? FindSourceProblem(string path) => Find(path, containmentOnly: true);
+
+    private PathProblem? Find(string path, bool containmentOnly)
     {
         try
         {
@@ -46,7 +53,7 @@ internal sealed class ExportPathGuard
             var readings = Readings.Select(dots => (Root: RealRoot(dots), Real: Resolve(full, dots))).Distinct().ToList();
             foreach (var (realRoot, real) in readings)
             {
-                var problem = Check(realRoot, real, readings.Count > 1);
+                var problem = Check(realRoot, real, readings.Count > 1, containmentOnly);
                 if (problem is not null)
                 {
                     return problem;
@@ -101,7 +108,7 @@ internal sealed class ExportPathGuard
         return realRoot;
     }
 
-    private static PathProblem? Check(string realRoot, string real, bool readingsDiffer)
+    private static PathProblem? Check(string realRoot, string real, bool readingsDiffer, bool containmentOnly)
     {
         var note = readingsDiffer ? ReadingsDifferNote : string.Empty;
         if (!IsInside(realRoot, real))
@@ -109,6 +116,11 @@ internal sealed class ExportPathGuard
             return new PathProblem(
                 DiagnosticCodes.PathOutsideProject,
                 $"resolves to '{real}', outside the project, through a link{note}");
+        }
+
+        if (containmentOnly)
+        {
+            return null;
         }
 
         var directory = Path.GetDirectoryName(real);

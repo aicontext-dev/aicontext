@@ -27,11 +27,20 @@ public static class ContextValidator
 
         var diagnostics = new List<Diagnostic>();
 
+        // The sources are read with the permissions of whoever runs the tool, so one that lies outside the project
+        // through a link is refused (AIC1008) before anything is opened. When the whole directory is such a link,
+        // nothing else is read or scanned.
+        var reader = new ContextFileReader(basePath);
+        if (Directory.Exists(contextDirectory) && reader.Refuse(contextDirectory, ContextDirectoryName) is { } outside)
+        {
+            return new ContextValidationResult([outside], false);
+        }
+
         if (!File.Exists(readmePath))
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MissingRequiredFile, $"Missing required file: {readmePath}", readmeLocation));
         }
-        else if (ContextFileReader.TryReadAllText(readmePath, DiagnosticCodes.UnreadableContextFile, readmeLocation, diagnostics) is { } readme &&
+        else if (reader.TryReadAllText(readmePath, DiagnosticCodes.UnreadableContextFile, readmeLocation, diagnostics) is { } readme &&
                  string.IsNullOrWhiteSpace(readme))
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.EmptyReadme, $"{readmePath} is empty.", readmeLocation));
@@ -42,7 +51,7 @@ public static class ContextValidator
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MissingRequiredFile, $"Missing required file: {contextPath}", contextLocation));
         }
-        else if (ContextFileReader.TryReadAllText(contextPath, DiagnosticCodes.UnreadableContextFile, contextLocation, diagnostics) is { } contextText)
+        else if (reader.TryReadAllText(contextPath, DiagnosticCodes.UnreadableContextFile, contextLocation, diagnostics) is { } contextText)
         {
             try
             {
@@ -76,11 +85,13 @@ public static class ContextValidator
                     continue;
                 }
 
-                var location = string.IsNullOrEmpty(issue.Location) ? "(root)" : issue.Location;
+                // The pointer contains the names of the properties of the file, which may be a secret.
+                var pointer = RedactPointer(issue.Location);
+                var location = string.IsNullOrEmpty(pointer) ? "(root)" : pointer;
                 diagnostics.Add(Diagnostic.Error(
                     DiagnosticCodes.SchemaViolation,
                     $"context.json {location}: {issue.Message}",
-                    $"{contextLocation}#{issue.Location}"));
+                    $"{contextLocation}#{pointer}"));
             }
 
             contextValid = issues.Count == 0;
@@ -90,13 +101,23 @@ public static class ContextValidator
             }
         }
 
-        diagnostics.AddRange(RuleLoader.Load(contextDirectory).Diagnostics);
+        diagnostics.AddRange(RuleLoader.Load(contextDirectory, reader).Diagnostics);
 
-        var extendedProfile = ValidateRecommendedFiles(contextDirectory, diagnostics) &&
+        // The sections that only export reads (patterns, glossary) are sources too, so validate says the same as export.
+        foreach (var optional in OptionalSections)
+        {
+            var path = Path.Combine(contextDirectory, optional);
+            if ((File.Exists(path) || Directory.Exists(path)) && reader.Refuse(path, $"{ContextDirectoryName}/{optional}") is { } refused)
+            {
+                diagnostics.Add(refused);
+            }
+        }
+
+        var extendedProfile = ValidateRecommendedFiles(contextDirectory, reader, diagnostics) &&
                               !diagnostics.Any(d => d.IsError) &&
                               contextValid;
 
-        foreach (var finding in PlaceholderScanner.ScanDirectory(contextDirectory))
+        foreach (var finding in PlaceholderScanner.ScanDirectory(contextDirectory, reader))
         {
             diagnostics.Add(Diagnostic.Warning(
                 DiagnosticCodes.PlaceholderContent,
@@ -105,7 +126,7 @@ public static class ContextValidator
                 $"{ContextDirectoryName}/{finding.File}:{finding.Line}"));
         }
 
-        var secretScan = SecretScanner.ScanDirectoryReport(contextDirectory);
+        var secretScan = SecretScanner.ScanDirectoryReport(contextDirectory, reader);
         foreach (var finding in secretScan.Findings)
         {
             diagnostics.Add(Diagnostic.Warning(
@@ -117,14 +138,30 @@ public static class ContextValidator
 
         foreach (var file in secretScan.Unscanned)
         {
+            var location = $"{ContextDirectoryName}/{file.File}";
+
+            // A refused source already has its own error; the scan only repeats it for files nothing else reads.
+            if (diagnostics.Any(d => d.Code == DiagnosticCodes.SourceOutsideProject && d.Location == location))
+            {
+                continue;
+            }
+
             diagnostics.Add(Diagnostic.Warning(
                 DiagnosticCodes.SecretScanIncomplete,
                 $"Secret scan incomplete for .aicontext/{file.File}: {file.Reason}. Check it manually.",
-                $"{ContextDirectoryName}/{file.File}"));
+                location));
         }
 
         return new ContextValidationResult(diagnostics, extendedProfile);
     }
+
+    private static readonly string[] OptionalSections = ["patterns.md", "glossary.md"];
+
+    // A JSON pointer with every segment that looks like a secret replaced.
+    private static string RedactPointer(string pointer) =>
+        string.IsNullOrEmpty(pointer)
+            ? pointer
+            : string.Join('/', pointer.Split('/').Select(SecretScanner.Redact));
 
     // Rules JSON Schema cannot express (or reports poorly).
     private static void ValidateCrossFieldRules(
@@ -213,7 +250,7 @@ public static class ContextValidator
 
     // Returns true when all recommended files exist and are non-empty (Extended profile, SPEC 8.2). A file that
     // cannot be read is an error, not a missing file: the validator cannot tell what it contains.
-    private static bool ValidateRecommendedFiles(string contextDirectory, List<Diagnostic> diagnostics)
+    private static bool ValidateRecommendedFiles(string contextDirectory, ContextFileReader reader, List<Diagnostic> diagnostics)
     {
         var allPresent = true;
         foreach (var fileName in RecommendedFiles)
@@ -230,7 +267,7 @@ public static class ContextValidator
             }
             else
             {
-                var content = ContextFileReader.TryReadAllText(path, DiagnosticCodes.UnreadableContextFile, location, diagnostics);
+                var content = reader.TryReadAllText(path, DiagnosticCodes.UnreadableContextFile, location, diagnostics);
                 if (content is null)
                 {
                     allPresent = false;

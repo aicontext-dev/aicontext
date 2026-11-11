@@ -48,9 +48,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            capabilities: file-symlink,directory-symlink,case-sensitive-directory,read-only-file,read-only-directory,unix-file-mode
+            capabilities: file-symlink,directory-symlink,hard-link,case-sensitive-directory,read-only-file,read-only-directory,unix-file-mode
           - os: windows-latest
-            capabilities: file-symlink,directory-symlink,case-sensitive-directory,case-insensitive-directory,read-only-file
+            capabilities: file-symlink,directory-symlink,hard-link,case-sensitive-directory,case-insensitive-directory,read-only-file
     steps:
       - uses: actions/checkout@v7
 

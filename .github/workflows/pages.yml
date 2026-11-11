@@ -8,6 +8,7 @@ on:
       - "SPEC.md"
       - "README.md"
       - "GOVERNANCE.md"
+      - "SECURITY.md"
       - "CHANGELOG.md"
       - "conformance/**"
       - "schema/**"
@@ -44,6 +45,7 @@ jobs:
           cp README.md _site/README.md
           cp SPEC.md _site/SPEC.md
           cp GOVERNANCE.md _site/GOVERNANCE.md
+          cp SECURITY.md _site/SECURITY.md
           cp CHANGELOG.md _site/CHANGELOG.md
           cp -r conformance _site/conformance
           cp schema/v1/context.schema.json _site/schema/v1/context.schema.json

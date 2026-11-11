@@ -355,11 +355,12 @@ aicontext validate [--path <directory>] [--strict]
 Checks `.aicontext/`:
 
 1. required files and the validity of `context.json` against the schema,
-2. recommended files (a warning if missing or empty),
-3. rules in `rules/`,
-4. accidentally pasted secrets (a warning),
-5. obvious placeholder text such as `TODO: …` in the context files (a warning; add `aicontext:allow-placeholder` to a line where it is intentional),
-6. prints the profile (Core/Extended) and reminds you that validation checks structure, not whether the content is useful.
+2. that every source is inside the project: a file or directory of `.aicontext/` that is a link leading outside the project is an error (`AIC1008`) and is not read (chapter 9),
+3. recommended files (a warning if missing or empty),
+4. rules in `rules/`,
+5. accidentally pasted secrets (a warning),
+6. obvious placeholder text such as `TODO: …` in the context files (a warning; add `aicontext:allow-placeholder` to a line where it is intentional),
+7. prints the profile (Core/Extended) and reminds you that validation checks structure, not whether the content is useful.
 
 Exit codes: `0` = OK, `1` = error. With `--strict`, warnings count as errors (useful in CI).
 
@@ -390,7 +391,7 @@ Important safety rules:
 - A destination that cannot be written is **known before the first file is written**, and then nothing is written: a directory where a file has to go, a directory above it that is really a file (`AIC4105`), an existing file that cannot be read, or one that is locked by another program or read-only (`AIC4106`). `--dry-run` and `--check` report these as errors too.
 - **A single file is written safely; the whole export is not a transaction.** A new file is created exclusively and removed again if it could not be written completely. An existing file is not truncated: the new content is written to a temporary file in the same directory (`.<name>.<random>.tmp`) and swapped in, so a failure leaves the old content intact and the temporary file is removed. This is not done when it would change what the destination means: a file that is a link is overwritten in place (the link stays), a read-only or locked file is not replaced (it would not be overwritten in place either), and the permission bits of the old file are kept on Unix. The owner and extended attributes of the old file are not carried over, and a hard link to it is no longer the same file afterwards.
 - If a write still fails midway (a lock appears, no free space, a directory without write permission), export **stops**, prints what was written (`Created`, `Updated`, `Removed`) and what was not (`Not written`), fails with exit code `1` and an `AIC4106` error. The files written before the failure stay as they are and **nothing is rolled back**; the files after it are untouched. Nothing is reported as written before it really was: a plan is announced as `Would create …`, and `Created …` is printed only after the file exists. To recover, fix the cause and run `aicontext export` again: it plans from the files as they are now, so the files already written show up as `Unchanged` and only the rest is written.
-- `export` and `status` stop on the same **errors** that `validate` reports (schema violation, unsupported `specVersion`, invalid rule, ...), so no files are generated from a broken `context.json`. Warnings never block them. A file in `.aicontext/` that cannot be read (locked, no permission) is such an error too (`AIC1007`, `AIC2006` for rules), not a crash.
+- `export` and `status` stop on the same **errors** that `validate` reports (schema violation, unsupported `specVersion`, invalid rule, a source outside the project, ...), so no files are generated from a broken `context.json`. Warnings never block them. A file in `.aicontext/` that cannot be read (locked, no permission) is such an error too (`AIC1007`, `AIC2006` for rules), not a crash.
 - Unchanged files are not written; the output is always the same (no date, same line endings), so in git you only see real changes.
 
 Examples:
@@ -676,7 +677,7 @@ Run `aicontext export` in each project separately (or add one `export --check` p
 
 | Kind | Examples | Consequence |
 |---|---|---|
-| **Error** | missing `README.md`/`context.json`, invalid JSON, schema violation, invalid rule (bad name, unclosed header) | `validate` exits with code `1`; `export` and `status` also stop and write nothing |
+| **Error** | missing `README.md`/`context.json`, invalid JSON, schema violation, invalid rule (bad name, unclosed header), a source that is a link leading outside the project | `validate` exits with code `1`; `export` and `status` also stop and write nothing |
 | **Warning** | missing/empty recommended file, placeholder text (`TODO: …`), possible secret, unknown key in a rule header, `windsurf` + `devin` together, `nestedAgents` without `split` | with `--strict` also code `1`; never blocks `export` |
 
 ### Protection against secrets
@@ -694,14 +695,52 @@ Example:
 WARNING: Possible secret (hard-coded credential) in .aicontext/README.md:3. Remove it, or add 'aicontext:allow-secret' to the line if it is an intentional example.
 ```
 
-- The secret value is **never printed** – only the file and line.
+- The secret value is **never printed** – only the file and line. The other messages that quote text of a file to point at a problem (an unsupported line in a rule header, an unknown header key, a path or scope pattern of a rule, an unknown property name in `context.json`) print `[redacted: looks like a secret]` instead when that text matches the same patterns; any other text is quoted as before.
 - Placeholders (`<your-key>`, `${TOKEN}`, `changeme`) and ordinary text ("password: required") are ignored.
 - If it is an intentional example, add `aicontext:allow-secret` on the same line.
 - It is a **heuristic**: it does not find everything and is sometimes wrong. It does not replace a dedicated secret-scanning tool.
 - Only the text extensions above are scanned. Files with other extensions (images, `.env`, `.pem`, ...) are **not** scanned and not mentioned, so do not keep secrets or secret files in `.aicontext/` at all.
 - A file that cannot be read, or a line that is too long or complex to check in time, is never skipped silently: `validate` warns `Secret scan incomplete for .aicontext/…` (an error with `--strict`) and you should check it manually.
+- The scan stays inside the project: a directory or file of `.aicontext/` that is a link leading outside the project is not entered or read and is reported as not scanned. A link cycle ends after one visit.
 
 What `.aicontext/` should never contain: tokens, passwords, private keys, customer personal data, confidential information that repository readers should not see. The files end up in git and in AI tools.
+
+### Sources must be inside the project
+
+The files of `.aicontext/` end up in the generated files, which AI tools and people then read, and the tool reads them with the permissions of whoever runs it. A repository you cloned can contain symbolic links or junctions, so a `.aicontext/README.md` that is really a link to `~/.ssh/config`, or an `.aicontext` directory that is a junction to a folder elsewhere on the disk, would copy that content into `AGENTS.md`. For that reason the real location of every source (links resolved, the same way export resolves a path it is about to write) must be inside the project, otherwise `validate`, `export` and `status` fail with `AIC1008` and the source is not read:
+
+```
+ERROR: …/.aicontext/README.md resolves to '/home/me/secret.txt', outside the project, through a link. A source of the project context must be inside the project; it was not read.
+```
+
+This covers `.aicontext/` itself, `README.md`, `context.json`, the other section files, the `rules/` directory and every rule. Links that stay inside the project work (a `README.md` that points to `docs/overview.md`, a `.aicontext` that points to another directory of the same project), and so does a project that you reach through a link. There is no option to allow an outside source. If you share context between repositories on purpose, copy it in (or use a git submodule, which is a real directory inside the project).
+
+### Security model and limits
+
+This section states what AIContext protects against and what it does not. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+
+The situation it is built for: you run `validate`, `export` or `init` in a repository you did not write (a clone, a pull request), or in your own by mistake. The tool should not read, write or delete outside the project, should not overwrite what it did not generate, and should not print what looks like a secret.
+
+**What it does:**
+
+- Writes and deletes stay inside the project: the real location of a file (links followed one component at a time) must be inside the project, and not inside a separate project; links that leave it are refused and nothing is written (`AIC4102`, `AIC4104`, see `export` in chapter 5). `init` does the same.
+- Sources stay inside the project (`AIC1008`, above).
+- A file that was not generated by aicontext is not overwritten without `--force`, and `--force` does not cross the project boundary.
+- A plan is checked again before it is applied, and an existing file is replaced through a temporary file, so a failed write leaves the old content.
+- The secret scan never prints a value, and messages that quote file text hide what looks like a secret.
+
+**What it does not do:**
+
+| Limit | What it means | What to do |
+|---|---|---|
+| **Not a sandbox** | The checks assume the file system does not change while the tool runs. Between the last check and the read or write there is a short gap; a program that changes links in your project at that moment can win the race. | Do not run it on a directory that another untrusted program writes to at the same time. |
+| **Symbolic links and junctions only** | A hard link cannot be told from a regular file. Reading follows it, so a hard-linked source is used like any file. Writing is safe: an update replaces the name with a new file and a deletion removes only the name, so the other file is never changed. | Do not hard-link files from outside the project into `.aicontext/`. |
+| **An export is not a transaction** | If a write fails midway, the files written before it stay (chapter 5, `export`). | Fix the cause and run it again. |
+| **The generated header is a convention, not authentication** | Anyone can write the line `Auto-generated by aicontext export` into a file; export then treats it as its own, may overwrite it, and removes it when it becomes an orphan. It protects hand-written files from accidents. | Review changes to generated files in pull requests like any other change. |
+| **The secret lint is a heuristic** | It recognizes common patterns in text files only. A secret it does not recognize is neither reported nor hidden when a message quotes the line. | Keep secrets out of `.aicontext/`, and use a dedicated secret scanner as well (for example in CI, next to `validate --strict`). |
+| **The content is not judged** | `validate` checks structure. Context from a contributor you do not trust can tell your assistant to do harmful things, so a change to `.aicontext/` deserves the same review as code. | Review `.aicontext/` and the generated files in pull requests. |
+| **Paths in messages** | A message about a refused link names the path it leads to. That is a path, not file content, but it can reveal the layout of your machine. | Take it into account before pasting output into a public issue. |
+| **Platforms** | The link checks are tested on Linux and Windows (CI: `ubuntu-latest`, `windows-latest`). macOS and network file systems are not tested. | Report what you find (SECURITY.md describes how). |
 
 ---
 
@@ -825,6 +864,7 @@ Delete `.aicontext/`. The generated files (`AGENTS.md`, …) remain as ordinary 
 | `Unknown option '--…' for 'aicontext …'` | a typo, or the option belongs to another command | the message lists the valid options; see `aicontext <command> --help` |
 | `Option '--…' requires a value` | an option such as `--path` or `--target` has no value | add the value, for example `--path .` |
 | `ERROR: context.json /…` when running `export` or `status` | the same schema error that `validate` reports; export does not generate from an invalid `context.json` | fix it (see `aicontext validate`) |
+| `… resolves to '…', outside the project, through a link. A source of the project context must be inside the project; it was not read.` (`AIC1008`) | a file or directory of `.aicontext/` (or `.aicontext/` itself) is a symlink or junction that leads out of the project | make it a real file or directory inside the project, or point the link inside it (chapter 9) |
 | `… resolves to '…', outside the project, through a link` / `Blocked` (`export`), or `… Init never writes outside the project.` (`init`) | a symlink or junction inside the project leads out of it (for example `.github`, a directory used by a nested rule, or `.aicontext/` itself for `init`); the message ends with "a link target contains '..' after another link, which platforms resolve differently" when a target like `alias/../x` leaves the project under one of its two readings | replace the link with a real directory or point it inside the project; for the second case use a target without `..` after a link |
 | `… resolves to '…', inside the separate project '…'` / `Blocked` | a symlink or junction leads into a directory that has its own `.aicontext/` | point the link at a directory of this project, or export that project from its own directory |
 | `… is a directory, but a file has to be written there` / `… cannot be written because '…' is a file, not a directory` (`AIC4105`) | a directory (or a file where a directory is needed) is in the way of a generated file; nothing was written | move or remove it, then run the command again |
@@ -857,6 +897,7 @@ Every error and warning of the library (and so of the CLI) carries a stable code
 | `AIC1005` | error | `project.name` is whitespace only |
 | `AIC1006` | error | `exports.defaultTarget` is not `all` or one of `exports.targets` |
 | `AIC1007` | error | a file in `.aicontext/` could not be read (locked by another program, no permission) |
+| `AIC1008` | error | a source (`.aicontext/`, a file or directory in it, a rule) is a link whose real location is outside the project; it was not read |
 | `AIC1101` | warning | `context.json` has no `$schema` |
 | `AIC1102` | warning | `$schema` is not the canonical URL |
 | `AIC1103` | warning | `windsurf` and `devin` are both exported |
