@@ -319,6 +319,8 @@ Implementations SHOULD provide lint checks for common secret patterns in context
 
 Such a lint is a heuristic aid: it does not find every secret and is no guarantee that none is present, and it does not replace dedicated secret-scanning tools. Implementations SHOULD document which files they scan, and SHOULD report a file they could not scan completely (for example an unreadable file) instead of skipping it silently.
 
+Implementations read the files of `.aicontext/` with the permissions of the user who runs them, and a repository can contain symbolic links, so a source can lead to a file anywhere on the machine, and its content would end up in the generated files. Implementations SHOULD NOT read a source whose real location (links resolved) is outside the project root, and SHOULD report it as an error instead of using its content. Links that stay inside the project MAY be used. Messages that repeat text taken from a file (a line, a key, a path) SHOULD NOT repeat text that looks like a secret.
+
 ## 11. Governance (project-level)
 
 Specification changes SHOULD use an RFC-like process:

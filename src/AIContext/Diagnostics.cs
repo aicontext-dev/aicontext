@@ -33,6 +33,7 @@ public static class DiagnosticCodes
     public const string ProjectNameWhitespace = "AIC1005";
     public const string DefaultTargetNotInTargets = "AIC1006";
     public const string UnreadableContextFile = "AIC1007";
+    public const string SourceOutsideProject = "AIC1008";
     public const string MissingSchemaProperty = "AIC1101";
     public const string SchemaUrlMismatch = "AIC1102";
     public const string WindsurfDevinOverlap = "AIC1103";

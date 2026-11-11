@@ -28,13 +28,18 @@ public static class PlaceholderScanner
 
     private static readonly Regex InlineCode = new("`[^`]*`", RegexOptions.CultureInvariant, RegexTimeout);
 
-    public static IReadOnlyList<PlaceholderFinding> ScanDirectory(string contextDirectory)
+    public static IReadOnlyList<PlaceholderFinding> ScanDirectory(string contextDirectory) =>
+        ScanDirectory(contextDirectory, sources: null);
+
+    // With sources, a file (or the rules directory) whose real location is outside the project is not read: the
+    // validator reports it as a refused source (AIC1008).
+    internal static IReadOnlyList<PlaceholderFinding> ScanDirectory(string contextDirectory, ContextFileReader? sources)
     {
         var findings = new List<PlaceholderFinding>();
         var files = SectionFiles.Select(name => (Name: name, Path: Path.Combine(contextDirectory, name))).ToList();
 
         var rulesDirectory = Path.Combine(contextDirectory, RuleLoader.RulesDirectoryName);
-        if (Directory.Exists(rulesDirectory))
+        if (Directory.Exists(rulesDirectory) && sources?.FindProblem(rulesDirectory) is null)
         {
             try
             {
@@ -51,7 +56,7 @@ public static class PlaceholderScanner
 
         foreach (var (name, path) in files)
         {
-            if (!File.Exists(path))
+            if (!File.Exists(path) || sources?.FindProblem(path) is not null)
             {
                 continue;
             }

@@ -76,7 +76,7 @@ public static class Frontmatter
             var colon = line.IndexOf(':', StringComparison.Ordinal);
             if (char.IsWhiteSpace(line[0]) || colon <= 0)
             {
-                return new FrontmatterResult(values, body, $"unsupported frontmatter line '{line.Trim()}'.");
+                return new FrontmatterResult(values, body, $"unsupported frontmatter line '{SecretScanner.Redact(line.Trim())}'.");
             }
 
             var key = line[..colon].Trim();
