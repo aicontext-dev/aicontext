@@ -95,7 +95,7 @@ Domain terminology that AI models commonly misunderstand.
 
 `rules/*.md` hold guidance that only matters for part of the codebase (for example UI code or integration connectors). Rules are tool-agnostic: the author declares *where* a rule applies and exporters translate that to each tool's native mechanism.
 
-Each rule is a markdown file directly inside `.aicontext/rules/`. The file name (without `.md`) is the rule name; it MUST consist of lowercase letters, digits, `-` or `_`, and MUST NOT be one of the reserved names `architecture`, `decisions`, `patterns`, `constraints`, `glossary`, `project`.
+Each rule is a markdown file directly inside `.aicontext/rules/`. The file name (without `.md`) is the rule name; it MUST consist of one or more lowercase letters, digits, `-` or `_` (in any order, so `_team` and `-team` are valid names), and MUST NOT be one of the reserved names `architecture`, `decisions`, `patterns`, `constraints`, `glossary`, `project`.
 
 A rule MAY start with a frontmatter block:
 
@@ -110,8 +110,8 @@ Use the shared design-system components.
 
 | Key | Meaning |
 | --- | --- |
-| `paths` | Glob patterns (`/` separators). The rule applies when working with matching files. Accepts a list or a comma-separated string. |
-| `description` | One line explaining when the rule is relevant. |
+| `paths` | Glob patterns (`/` separators). The rule applies when working with matching files. Accepts a list or a comma-separated string, and MUST contain at least one pattern. |
+| `description` | One line explaining when the rule is relevant. MUST NOT be empty. |
 
 The rule kind follows from the frontmatter:
 
@@ -119,7 +119,28 @@ The rule kind follows from the frontmatter:
 - only `description` present: **on-demand**, loaded when the agent decides it is relevant.
 - neither: **always on**.
 
-Implementations MUST ignore unknown frontmatter keys (and SHOULD warn about them). Implementations SHOULD treat `architecture.md`, `decisions.md`, `patterns.md` and `glossary.md` as on-demand content and `README.md` and `constraints.md` as always-on content when they apply a split layout (see 6.4).
+A key that is present is not the same as a key that is absent. A rule whose `paths` or `description` is present but has no usable value (`paths: []`, `paths:`, `description:`) is invalid; an implementation MUST report an error and MUST NOT export the rule as always-on or in any other broader form than the author wrote.
+
+Implementations MUST ignore unknown frontmatter keys, whatever their value looks like (including a nested value), and SHOULD warn about them. Keys are case-sensitive: `Paths` is an unknown key, not `paths`, so a rule that spells it that way is always on. Implementations SHOULD treat `architecture.md`, `decisions.md`, `patterns.md` and `glossary.md` as on-demand content and `README.md` and `constraints.md` as always-on content when they apply a split layout (see 6.4).
+
+#### 4.4.1 Frontmatter syntax
+
+The frontmatter is a small subset of YAML, not YAML: text that is valid YAML is not necessarily valid frontmatter, and the reverse. Implementations need no YAML parser, but MUST read the following the same way, because a different reading can change the scope of a rule.
+
+- **Block.** The frontmatter starts on the first line of the file, which is exactly `---`, and ends at the next line that is `---` (trailing whitespace ignored). Everything after that line is the body. A file whose first line is not `---` has no frontmatter. A block that is never closed is an error.
+- **Lines.** Blank lines and lines whose first non-blank character is `#` are ignored. Every other line is either a *key line* or belongs to the value of the key above it. A key line starts in the first column and has the form `key: value`; the key is the text before the first colon, trimmed, and is not empty. A line that is indented or is a list item (`- item`) belongs to the key above it; such a line with no key above it, and any other line, is an error. A key MUST NOT appear twice, and repeating it is an error (the unknown keys too).
+- **Scalars.** A scalar is plain text, or a quoted string: `"…"` (the escapes `\"` and `\\`, any other backslash is literal) or `'…'` (`''` stands for one quote). A quote starts a quoted string only at the start of a value or of a list item; anywhere else it is an ordinary character (`src/it's/**` is a plain item). A quoted string in the value of a known key MUST be closed, and only a comment may follow the closing quote; otherwise the value is an error. The value of an unknown key is not interpreted at all, so these rules do not apply to it.
+- **Lists.** A flow list is `[item, item]`, a block list is one `- item` line per item below a key with no inline value. Commas inside `{ }` do not separate items. Items are trimmed. An item written as a quoted string is read without its quotes, so `["a, b", c]` has the items `a, b` and `c`.
+- **Comments.** A `#` at the start of a value, or after whitespace, outside a quoted string, starts a comment that runs to the end of the line. A value that has to contain ` #` is quoted (`description: "Issue #12"`).
+- **Nested values.** An indented or multi-line block under a key that is not a block list is a *nested value*. The subset does not interpret it: it is ignored for an unknown key, and an error for `paths` and `description`.
+
+How the known keys read a value:
+
+- `paths`: a flow list, a block list, or a scalar that is read as a comma-separated list. A scalar that is one quoted string is the text of the list (`paths: "src/**, lib/**"` has two items); several quoted items need the brackets (`["src/**", "lib/**"]`), and a bare list with a quoted item is an error. Empty items are ignored (`[a, , b]` and `a,,b` have the items `a` and `b`). At least one item MUST remain, otherwise the rule is invalid. Items MUST use `/` as the separator.
+- `description`: one scalar. A list or a nested value is an error, and so is an empty value.
+- Any other key: not read, only warned about.
+
+The [conformance suite](./conformance/README.md) lists rule files for these cases with the outcome an implementation has to produce.
 ## 5. `context.json` format (v0.1 draft)
 
 Minimum valid shape:
@@ -184,7 +205,7 @@ The [published schema](./schema/v1/context.schema.json) expresses the structure 
 1. `exports.defaultTarget` is listed in `exports.targets` (or is `all`). JSON Schema cannot compare a value with another property's entries.
 2. `metadata.lastReviewed` is a date. The schema declares `"format": "date"`, which JSON Schema treats as an annotation unless the evaluator is told to assert formats; the implementation MUST turn format assertion on, or check the date itself.
 
-The [conformance suite](./conformance/README.md) checks exactly the rules in 5.1 and 5.2: every case names the section it relies on.
+The [conformance suite](./conformance/README.md) checks the rules in 5.1 and 5.2 for `context.json`, and the rule files of 4.4 and 4.4.1: every case names the section it relies on.
 
 ## 6. Export model
 
@@ -367,4 +388,4 @@ Planned command surface:
 
 This section is informative only; command behavior is defined by tooling implementation, not by the file format itself.
 
-Independent implementations can check their handling of `context.json` against the language-neutral [conformance suite](./conformance/README.md), which lists valid and invalid documents and where an error is expected.
+Independent implementations can check their handling of `context.json` and of rule files against the language-neutral [conformance suite](./conformance/README.md), which lists valid and invalid documents and rule files and what an implementation has to produce.

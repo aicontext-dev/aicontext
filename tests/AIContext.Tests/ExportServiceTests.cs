@@ -152,6 +152,20 @@ public sealed class ExportServiceTests : IDisposable
     }
 
     [Fact]
+    public void Plan_RuleWithAnEmptyScope_IsAnErrorAndItsBodyIsNeverExportedAsAlwaysOn()
+    {
+        Directory.CreateDirectory(InProject(".aicontext/rules"));
+        File.WriteAllText(InProject(".aicontext/rules/ui.md"), "---\npaths: []\n---\nRULE-BODY-MARKER\n");
+
+        var plan = Plan("agents");
+
+        Assert.Empty(plan.Files);
+        Assert.Equal(".aicontext/rules/ui.md", ErrorWithCode(plan, DiagnosticCodes.EmptyFrontmatterValue).Location);
+        Assert.Throws<InvalidOperationException>(() => ExportService.Apply(plan));
+        Assert.False(File.Exists(InProject("AGENTS.md")));
+    }
+
+    [Fact]
     public void Plan_ProjectWithOnlyWarnings_HasNoErrorsButReportsTheWarnings()
     {
         var plan = Plan("agents");

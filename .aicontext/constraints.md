@@ -6,6 +6,7 @@ Hard rules. Violating these causes recurring mistakes.
 ### Spec and schema
 - The schema `schema/v1/context.schema.json` is the only definition of `context.json`. Do not re-implement schema rules in code; add them to the schema.
 - A change to the format must update `SPEC.md`, the schema, tests and `CHANGELOG.md` in the same change.
+- Rule frontmatter (`Frontmatter`, `RuleLoader`) follows SPEC 4.4.1. A change of what it accepts updates SPEC 4.4.1, the rule fixtures in `conformance/v0.1/rules` (`ruleCases` in the manifest), the tests and `CHANGELOG.md`, and a header that cannot be read as written is an error, never an always-on fallback.
 
 ### Export behavior
 - Output must stay deterministic: no timestamps, no `Environment.NewLine`, no machine-specific paths, no dependence on current time or OS. Always LF.

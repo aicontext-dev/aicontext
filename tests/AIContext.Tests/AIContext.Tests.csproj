@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\conformance\**\*.json" Link="conformance\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\conformance\v0.1\rules\**\*.md" Link="conformance\v0.1\rules\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\SPEC.md" Link="spec\SPEC.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

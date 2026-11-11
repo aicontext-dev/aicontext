@@ -171,4 +171,95 @@ public sealed class ConformanceTests : IDisposable
             Assert.Equal(!testCase.GetProperty("valid").GetBoolean(), testCase.TryGetProperty("pointer", out _));
         }
     }
+
+    public static IEnumerable<object[]> RuleCases()
+    {
+        using var manifest = ReadManifest();
+        foreach (var testCase in manifest.RootElement.GetProperty("ruleCases").EnumerateArray())
+        {
+            yield return [testCase.GetProperty("file").GetString()!];
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(RuleCases))]
+    public void RuleCase_BehavesAsTheManifestSays(string file)
+    {
+        using var manifest = ReadManifest();
+        var testCase = manifest.RootElement.GetProperty("ruleCases").EnumerateArray()
+            .Single(c => c.GetProperty("file").GetString() == file);
+        var installAs = testCase.TryGetProperty("installAs", out var name) ? name.GetString()! : Path.GetFileName(file);
+
+        var rulesDirectory = Path.Combine(_project, ".aicontext", "rules");
+        Directory.CreateDirectory(rulesDirectory);
+        File.Copy(Path.Combine(SuiteDirectory, file.Replace('/', Path.DirectorySeparatorChar)), Path.Combine(rulesDirectory, installAs));
+
+        var result = RuleLoader.Load(Path.Combine(_project, ".aicontext"));
+        var location = $".aicontext/rules/{installAs}";
+
+        if (!testCase.GetProperty("valid").GetBoolean())
+        {
+            Assert.Contains(result.Diagnostics, d => d.IsError && d.Location == location);
+            Assert.Empty(result.Rules);
+            return;
+        }
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.IsError);
+        var rule = Assert.Single(result.Rules);
+        var expect = testCase.GetProperty("expect");
+
+        Assert.Equal(expect.GetProperty("kind").GetString(), KindName(rule.Kind));
+        Assert.Equal(expect.GetProperty("paths").EnumerateArray().Select(p => p.GetString()!), rule.Paths);
+        Assert.Equal(expect.GetProperty("description").GetString(), rule.Description);
+
+        if (testCase.TryGetProperty("warns", out var warns) && warns.GetBoolean())
+        {
+            Assert.Contains(result.Diagnostics, d => !d.IsError && d.Location == location);
+        }
+    }
+
+    private static string KindName(RuleKind kind) => kind switch
+    {
+        RuleKind.Always => "always",
+        RuleKind.OnDemand => "on-demand",
+        RuleKind.Scoped => "scoped",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    [Fact]
+    public void RuleManifest_ListsEveryFixtureAndEveryListedFileExists()
+    {
+        using var manifest = ReadManifest();
+        var listed = manifest.RootElement.GetProperty("ruleCases").EnumerateArray()
+            .Select(c => c.GetProperty("file").GetString()!)
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+
+        var onDisk = new[] { "valid", "invalid" }
+            .SelectMany(directory => Directory.EnumerateFiles(Path.Combine(SuiteDirectory, "rules", directory), "*.md")
+                .Select(f => $"rules/{directory}/{Path.GetFileName(f)}"))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.NotEmpty(listed);
+        Assert.Equal(onDisk, listed);
+        Assert.Equal(listed.Count, listed.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void RuleManifest_EveryCaseNamesASpecSectionThatExistsAndDeclaresItsOutcome()
+    {
+        var headings = ReadSpecHeadings();
+        using var manifest = ReadManifest();
+
+        foreach (var testCase in manifest.RootElement.GetProperty("ruleCases").EnumerateArray())
+        {
+            var file = testCase.GetProperty("file").GetString()!;
+            Assert.Contains(testCase.GetProperty("spec").GetString()!, headings);
+
+            var valid = testCase.GetProperty("valid").GetBoolean();
+            Assert.Equal(file.StartsWith("rules/valid/", StringComparison.Ordinal), valid);
+            Assert.Equal(valid, testCase.TryGetProperty("expect", out _));
+        }
+    }
 }

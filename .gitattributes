@@ -1,2 +1,5 @@
 # Shell scripts run on Linux and macOS runners, so they must have LF line endings in every checkout.
 *.sh text eol=lf
+
+# The conformance fixtures are data other implementations read: the same bytes in every checkout.
+conformance/** text eol=lf

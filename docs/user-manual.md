@@ -591,7 +591,26 @@ paths: ["src/connectors/**"]
 
 `paths` can be a list or comma-separated text (`paths: src/ui/**, **/*.tsx`). Use `/` as the separator, also on Windows.
 
-File name rules: lowercase letters, digits, `-`, `_` (for example `ui.md`, `api-v2.md`). Reserved names: `architecture`, `decisions`, `patterns`, `constraints`, `glossary`, `project`.
+File name rules: lowercase letters, digits, `-`, `_`, at least one character (for example `ui.md`, `api-v2.md`, `_team.md`). Reserved names: `architecture`, `decisions`, `patterns`, `constraints`, `glossary`, `project`.
+
+### What the header may contain
+
+The header is a small subset of YAML, not YAML. It is strict about the few things that would otherwise change what a rule applies to: a rule whose header cannot be read as written is an **error**, it is never quietly exported as an always-on rule. The full grammar is in [SPEC 4.4.1](../SPEC.md).
+
+| You write | Result |
+|---|---|
+| `paths: ["src/ui/**", "**/*.tsx"]`, a `- item` list below `paths:`, or `paths: src/ui/**, **/*.tsx` | a scoped rule with these patterns |
+| `paths: "src/ui/**, lib/**"` (one quoted string) | two patterns; for a pattern that contains a comma, use a list: `paths: ["docs/a, b/**"]` |
+| `paths: [src/**, , lib/**,]` | empty items are ignored: `src/**` and `lib/**` |
+| `paths: []`, `paths:`, `paths: ""`, `paths: ,` | **error** (`AIC2007`): no pattern means no scope, and the rule is not exported at all. Remove the key if you want an always-on rule |
+| `description:` with nothing after it | **error** (`AIC2007`); remove the key or write the sentence |
+| the same key twice | **error** (`AIC2003`); only one value can count |
+| `paths: src/** # source files` | the comment is ignored: a `#` after a space, outside quotes, starts one. A value that has to contain ` #` goes into quotes: `description: "Issue #12"` |
+| `paths: "src/**` or `paths: "a" b` | **error** (`AIC2003`): a quote must be closed and only a comment may follow it. Quotes need the brackets of a list for several items: `["a", "b"]` |
+| `owner:` followed by an indented block, or `owner: {a: 1}` | an unknown key: ignored with a warning (`AIC2103`), whatever its value looks like |
+| `Paths: src/**` | an unknown key as well (keys are case-sensitive): a warning, and the rule is **always on** |
+
+An indented or multi-line value under `paths` or `description` (`description: >`) is an error: a description is one line.
 
 ### Enabling it
 
@@ -873,10 +892,12 @@ Delete `.aicontext/`. The generated files (`AGENTS.md`, …) remain as ordinary 
 | `WARNING: Target '…' is not exported (exports.targets), but its generated files are still on disk` | a target was removed from `exports.targets`, but its earlier output is still in the repository and tools may keep loading it | delete the listed files, or add the target back |
 | `… belongs to a separate AIContext project` (in `status`) | the rule is scoped to a directory that has its own `.aicontext/` | export that project from its own directory; the rule stays in the root file |
 | `Export is out of date` (with `--check`) | the source or a generated file changed | run `aicontext export --target all` and commit |
-| `rules/Bad Name.md: file name must use lowercase…` | disallowed rule name | rename it (for example `bad-name.md`) |
+| `rules/Bad Name.md: file name must use lowercase…` | disallowed rule name (a name may start with `-` or `_`, but has no spaces, dots or capital letters) | rename it (for example `bad-name.md`) |
 | `… is reserved for a built-in section` | the rule name is reserved | choose another name |
 | `… frontmatter is not closed with '---'` | the rule header has no closing `---` | add it |
 | `path '…' must use '/' as separator` | you used `\` in `paths` | replace it with `/` |
+| `'paths' is present but has no pattern` / `'description' is present but empty` (`AIC2007`) | `paths: []`, `paths:` or `description:` with no value | write the value, or remove the key (a rule without `paths` is on-demand or always on, which is a different rule) |
+| `duplicate key '…'`, `unsupported frontmatter line`, `the quote … is not closed`, `there is text after the closing quote` (`AIC2003`) | the header repeats a key, has a line that is not `key: value`, or has a quote that is not closed | fix the line the message names; see "What the header may contain" in chapter 7 |
 | A rule was not exported separately | `layout` is not `split`; or it is Copilot/Claude on-demand content (it stays in the main file) | check `aicontext status` |
 | A rule stayed in the root `AGENTS.md` | the pattern is not an exact existing directory | see `status` (it gives the reason) |
 | `exports.nestedAgents has no effect unless exports.layout is 'split'` | `nestedAgents` without `split` | set `"layout": "split"` |
@@ -905,12 +926,13 @@ Every error and warning of the library (and so of the CLI) carries a stable code
 | `AIC1105` | warning | a recommended file is missing |
 | `AIC1106` | warning | a recommended file is empty |
 | `AIC1107` | warning | placeholder text (`TODO: …`, the `init` stubs) is still in a context file; the location holds file and line |
-| `AIC2001` | error | a rule file name uses disallowed characters |
+| `AIC2001` | error | a rule file name uses disallowed characters (anything but lowercase letters, digits, `-` and `_`, or it is empty) |
 | `AIC2002` | error | a rule file name is reserved for a built-in section |
-| `AIC2003` | error | a rule header (frontmatter) cannot be read, for example it is not closed |
-| `AIC2004` | error | a rule `description` is not a single line |
+| `AIC2003` | error | a rule header (frontmatter) cannot be read: it is not closed, a line is not `key: value`, a key is repeated, a quote is not closed or is followed by text, or the value of `paths` is nested |
+| `AIC2004` | error | a rule `description` is not a single line (a list, or a nested or multi-line value) |
 | `AIC2005` | error | a rule path uses `\` instead of `/` |
 | `AIC2006` | error | a rule file, or the `rules/` directory, could not be read (locked by another program, no permission) |
+| `AIC2007` | error | `paths` or `description` is present but has no value (`paths: []`, `paths:`, `description:`); the rule is rejected, never exported as always-on |
 | `AIC2101` | warning | a subdirectory of `rules/` is ignored |
 | `AIC2102` | warning | a file in `rules/` that is not `.md` is ignored |
 | `AIC2103` | warning | an unknown key in a rule header is ignored |
