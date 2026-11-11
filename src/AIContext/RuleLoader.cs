@@ -40,7 +40,12 @@ public static class RuleLoader
     private static readonly Regex NamePattern = new("^[a-z0-9][a-z0-9_-]*$", RegexOptions.CultureInvariant);
     private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal) { "description", "paths" };
 
-    public static RuleLoadResult Load(string contextDirectory)
+    // The rules of a .aicontext directory. Rule files (and the rules directory) that lie outside the project through a
+    // link are refused (AIC1008), as every other source of the context.
+    public static RuleLoadResult Load(string contextDirectory) =>
+        Load(contextDirectory, new ContextFileReader(ContextFileReader.ProjectRootOf(contextDirectory)));
+
+    internal static RuleLoadResult Load(string contextDirectory, ContextFileReader reader)
     {
         var rules = new List<RuleDocument>();
         var diagnostics = new List<Diagnostic>();
@@ -48,6 +53,12 @@ public static class RuleLoader
         var rulesDirectory = Path.Combine(contextDirectory, RulesDirectoryName);
         if (!Directory.Exists(rulesDirectory))
         {
+            return new RuleLoadResult(rules, diagnostics);
+        }
+
+        if (reader.Refuse(rulesDirectory, ".aicontext/rules") is { } outside)
+        {
+            diagnostics.Add(outside);
             return new RuleLoadResult(rules, diagnostics);
         }
 
@@ -90,7 +101,7 @@ public static class RuleLoader
                 continue;
             }
 
-            var rule = LoadRule(file, fileName, diagnostics);
+            var rule = LoadRule(file, fileName, reader, diagnostics);
             if (rule is not null)
             {
                 rules.Add(rule);
@@ -100,7 +111,7 @@ public static class RuleLoader
         return new RuleLoadResult(rules, diagnostics);
     }
 
-    private static RuleDocument? LoadRule(string path, string fileName, List<Diagnostic> diagnostics)
+    private static RuleDocument? LoadRule(string path, string fileName, ContextFileReader reader, List<Diagnostic> diagnostics)
     {
         var name = fileName[..^3];
         var label = $"rules/{fileName}";
@@ -124,7 +135,7 @@ public static class RuleLoader
             valid = false;
         }
 
-        var text = ContextFileReader.TryReadAllText(path, DiagnosticCodes.UnreadableRuleFile, location, diagnostics);
+        var text = reader.TryReadAllText(path, DiagnosticCodes.UnreadableRuleFile, location, diagnostics);
         if (text is null)
         {
             return null;
@@ -144,9 +155,10 @@ public static class RuleLoader
         {
             if (!KnownKeys.Contains(key))
             {
+                // The text of the file is repeated in the message; a secret-looking one is not (SecretScanner.Redact).
                 diagnostics.Add(Diagnostic.Warning(
                     DiagnosticCodes.UnknownFrontmatterKey,
-                    $"{label}: unknown frontmatter key '{key}' is ignored.",
+                    $"{label}: unknown frontmatter key '{SecretScanner.Redact(key)}' is ignored.",
                     location));
             }
             else if (key == "description")
@@ -181,7 +193,7 @@ public static class RuleLoader
                     {
                         diagnostics.Add(Diagnostic.Error(
                             DiagnosticCodes.InvalidRulePathSeparator,
-                            $"{label}: path '{entry}' must use '/' as separator.",
+                            $"{label}: path '{SecretScanner.Redact(entry)}' must use '/' as separator.",
                             location));
                         valid = false;
                     }

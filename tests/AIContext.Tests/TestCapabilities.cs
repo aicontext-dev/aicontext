@@ -20,7 +20,10 @@ public enum LinkCapability
     // privileged account ignores them).
     ReadOnlyDirectory,
     // Unix permission bits (File.GetUnixFileMode); not available on Windows.
-    UnixFileMode
+    UnixFileMode,
+    // Hard links: the .NET API has none, so the platform command creates one (mklink /H on Windows, ln elsewhere).
+    // Both names must be on the same volume.
+    HardLink
 }
 
 // Probes the capabilities once per test run, in a temporary directory, without changing host settings.
@@ -40,6 +43,7 @@ internal static class TestCapabilities
         LinkCapability.ReadOnlyFile => "read-only-file",
         LinkCapability.ReadOnlyDirectory => "read-only-directory",
         LinkCapability.UnixFileMode => "unix-file-mode",
+        LinkCapability.HardLink => "hard-link",
         _ => throw new ArgumentOutOfRangeException(nameof(capability))
     };
 
@@ -79,7 +83,8 @@ internal static class TestCapabilities
                 [LinkCapability.CaseInsensitiveDirectory] = ProbeCaseInsensitiveDirectory(directory),
                 [LinkCapability.ReadOnlyFile] = ProbeReadOnlyFile(directory),
                 [LinkCapability.ReadOnlyDirectory] = ProbeReadOnlyDirectory(directory),
-                [LinkCapability.UnixFileMode] = OperatingSystem.IsWindows() ? "Windows has no Unix permission bits" : null
+                [LinkCapability.UnixFileMode] = OperatingSystem.IsWindows() ? "Windows has no Unix permission bits" : null,
+                [LinkCapability.HardLink] = ProbeHardLink(directory)
             };
         }
         finally
@@ -158,6 +163,28 @@ internal static class TestCapabilities
         return Directory.Exists(Path.Combine(probe, "A"))
             ? null
             : "the temporary directory distinguishes paths that differ only by letter case";
+    }
+
+    private static string? ProbeHardLink(string directory)
+    {
+        var original = Path.Combine(directory, "hard-original.txt");
+        var link = Path.Combine(directory, "hard-link.txt");
+        File.WriteAllText(original, "probe");
+        try
+        {
+            var (exitCode, output) = TestLinks.TryCreateHardLink(link, original);
+            if (exitCode != 0)
+            {
+                return $"hard links cannot be created ({output.Trim()})";
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            return $"the command that creates hard links is not available ({ex.Message})";
+        }
+
+        File.AppendAllText(original, "!");
+        return File.ReadAllText(link) == "probe!" ? null : "a hard link does not share the content of its original";
     }
 
     private static string? ProbeReadOnlyFile(string directory)

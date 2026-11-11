@@ -26,15 +26,17 @@ public static class ContextLoader
             return new ContextLoadResult(null, validation.Diagnostics);
         }
 
-        // The files are read again after validation; one that became unreadable in between is an error like any other.
+        // The files are read again after validation; one that became unreadable (or that became a link out of the
+        // project) in between is an error like any other.
+        var reader = new ContextFileReader(basePath);
         var diagnostics = new List<Diagnostic>(validation.Diagnostics);
-        var contextText = ContextFileReader.TryReadAllText(contextPath, DiagnosticCodes.UnreadableContextFile, ".aicontext/context.json", diagnostics);
-        var readme = ContextFileReader.TryReadAllText(readmePath, DiagnosticCodes.UnreadableContextFile, ".aicontext/README.md", diagnostics);
-        var architecture = ReadSection(contextDirectory, "architecture.md", diagnostics);
-        var decisions = ReadSection(contextDirectory, "decisions.md", diagnostics);
-        var patterns = ReadSection(contextDirectory, "patterns.md", diagnostics);
-        var constraints = ReadSection(contextDirectory, "constraints.md", diagnostics);
-        var glossary = ReadSection(contextDirectory, "glossary.md", diagnostics);
+        var contextText = reader.TryReadAllText(contextPath, DiagnosticCodes.UnreadableContextFile, ".aicontext/context.json", diagnostics);
+        var readme = reader.TryReadAllText(readmePath, DiagnosticCodes.UnreadableContextFile, ".aicontext/README.md", diagnostics);
+        var architecture = ReadSection(reader, contextDirectory, "architecture.md", diagnostics);
+        var decisions = ReadSection(reader, contextDirectory, "decisions.md", diagnostics);
+        var patterns = ReadSection(reader, contextDirectory, "patterns.md", diagnostics);
+        var constraints = ReadSection(reader, contextDirectory, "constraints.md", diagnostics);
+        var glossary = ReadSection(reader, contextDirectory, "glossary.md", diagnostics);
         if (contextText is null || readme is null || diagnostics.Any(d => d.IsError))
         {
             return new ContextLoadResult(null, diagnostics);
@@ -43,7 +45,7 @@ public static class ContextLoader
         using var document = JsonDocument.Parse(contextText);
         var root = document.RootElement.Clone();
 
-        var ruleLoad = RuleLoader.Load(contextDirectory);
+        var ruleLoad = RuleLoader.Load(contextDirectory, reader);
         if (ruleLoad.Diagnostics.Any(d => d.IsError))
         {
             diagnostics.AddRange(ruleLoad.Diagnostics.Where(d => d.IsError));
@@ -85,7 +87,7 @@ public static class ContextLoader
 
     // The trimmed text of an optional section; null when the file is absent or empty, or after an error diagnostic
     // was added because it could not be read.
-    private static string? ReadSection(string contextDirectory, string fileName, List<Diagnostic> diagnostics)
+    private static string? ReadSection(ContextFileReader reader, string contextDirectory, string fileName, List<Diagnostic> diagnostics)
     {
         var filePath = Path.Combine(contextDirectory, fileName);
         if (!File.Exists(filePath))
@@ -93,7 +95,7 @@ public static class ContextLoader
             return null;
         }
 
-        var content = ContextFileReader.TryReadAllText(filePath, DiagnosticCodes.UnreadableContextFile, $".aicontext/{fileName}", diagnostics)?.Trim();
+        var content = reader.TryReadAllText(filePath, DiagnosticCodes.UnreadableContextFile, $".aicontext/{fileName}", diagnostics)?.Trim();
         return string.IsNullOrWhiteSpace(content) ? null : content;
     }
 }

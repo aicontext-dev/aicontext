@@ -29,6 +29,20 @@ internal static class TestLinks
     // Needs LinkCapability.FileSymlink. The target may not exist (a dangling link).
     public static void CreateFileLink(string link, string target) => File.CreateSymbolicLink(link, target);
 
+    // A second name for an existing file: both names share one file, so a write through either is visible through
+    // the other. Hard links are not in the .NET API; the platform command creates one. Needs
+    // LinkCapability.HardLink and both names on the same volume.
+    public static (int ExitCode, string Output) TryCreateHardLink(string link, string existing) =>
+        OperatingSystem.IsWindows()
+            ? Run("cmd.exe", "/c", "mklink", "/H", link, existing)
+            : Run("ln", existing, link);
+
+    public static void CreateHardLink(string link, string existing)
+    {
+        var (exitCode, output) = TryCreateHardLink(link, existing);
+        Assert.True(exitCode == 0, output);
+    }
+
     // Creates an empty directory in which paths that differ only by letter case are different entries. Windows
     // marks the one directory with fsutil (a per-directory NTFS attribute, no host setting and no elevation);
     // Linux directories already behave that way. Returns false and the reason when it cannot be done.

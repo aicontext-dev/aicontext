@@ -95,7 +95,7 @@ public static class NestedAgentsPlanner
             directory.IndexOfAny(GlobCharacters) >= 0 ||
             segments.Any(s => s.Length == 0 || s == "." || s == ".."))
         {
-            reason = $"pattern '{pattern}' is not a directory scope (use '<directory>/**')";
+            reason = $"pattern '{SecretScanner.Redact(pattern)}' is not a directory scope (use '<directory>/**')";
             return null;
         }
 
@@ -103,22 +103,23 @@ public static class NestedAgentsPlanner
         var root = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         if (!Path.GetFullPath(ExportTarget.ResolveRelative(basePath, directory)).StartsWith(root, StringComparison.Ordinal))
         {
-            reason = $"pattern '{pattern}' points outside the repository";
+            reason = $"pattern '{SecretScanner.Redact(pattern)}' points outside the repository";
             return null;
         }
 
+        var shown = SecretScanner.Redact(directory);
         if (!Directory.Exists(ExportTarget.ResolveRelative(basePath, directory)))
         {
             reason = File.Exists(ExportTarget.ResolveRelative(basePath, directory))
-                ? $"'{directory}' is a file, not a directory"
-                : $"directory '{directory}' does not exist";
+                ? $"'{shown}' is a file, not a directory"
+                : $"directory '{shown}' does not exist";
             return null;
         }
 
         var nestedProject = ProjectBoundary.FindNestedProject(basePath, directory);
         if (nestedProject is not null)
         {
-            reason = $"'{directory}' belongs to a separate AIContext project ('{nestedProject}' has its own .aicontext/)";
+            reason = $"'{shown}' belongs to a separate AIContext project ('{SecretScanner.Redact(nestedProject)}' has its own .aicontext/)";
             return null;
         }
 

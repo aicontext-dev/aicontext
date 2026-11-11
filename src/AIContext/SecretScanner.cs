@@ -50,9 +50,34 @@ public static class SecretScanner
     public static IReadOnlyList<SecretFinding> ScanDirectory(string directory) =>
         ScanDirectoryReport(directory).Findings;
 
+    public const string RedactedText = "[redacted: looks like a secret]";
+
+    // For text that was taken from a file and is about to be repeated in a message: the text itself, unless it looks
+    // like a secret (the same patterns as the scan), in which case RedactedText. The scan never prints the value it
+    // found; this keeps the other messages of the tool, which quote a line, a key or a path of the file to point at
+    // the problem, from printing it either. A line the patterns cannot handle in time counts as a secret. It is as
+    // heuristic as the scan: what the scan does not recognize is repeated.
+    public static string Redact(string text)
+    {
+        try
+        {
+            return DetectKind(text) is null ? text : RedactedText;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return RedactedText;
+        }
+    }
+
     // Files are read line by line, so there is no size limit. Only text files (ScannedExtensions) are scanned;
     // anything that cannot be read or checked completely is listed in Unscanned instead of being skipped silently.
-    public static SecretScanReport ScanDirectoryReport(string directory)
+    // Links are followed wherever they lead; the validator uses the overload that stays inside the project.
+    public static SecretScanReport ScanDirectoryReport(string directory) =>
+        ScanDirectoryReport(directory, sources: null);
+
+    // With sources, a file or directory whose real location is outside the project (reached through a link) is not
+    // entered or read and is listed in Unscanned, so the scan cannot be used to probe files outside the project.
+    internal static SecretScanReport ScanDirectoryReport(string directory, ContextFileReader? sources)
     {
         var findings = new List<SecretFinding>();
         var unscanned = new List<UnscannedFile>();
@@ -61,13 +86,10 @@ public static class SecretScanner
             return new SecretScanReport(findings, unscanned);
         }
 
-        List<string> files;
+        var files = new List<string>();
         try
         {
-            files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
-                .Where(f => ScannedExtensions.Contains(Path.GetExtension(f)))
-                .OrderBy(f => f, StringComparer.Ordinal)
-                .ToList();
+            Collect(directory, directory, sources, files, unscanned, new HashSet<string>(StringComparer.Ordinal), 0);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -75,7 +97,7 @@ public static class SecretScanner
             return new SecretScanReport(findings, unscanned);
         }
 
-        foreach (var file in files)
+        foreach (var file in files.Order(StringComparer.Ordinal))
         {
             var relative = Path.GetRelativePath(directory, file).Replace('\\', '/');
             try
@@ -93,6 +115,48 @@ public static class SecretScanner
         }
 
         return new SecretScanReport(findings, unscanned);
+    }
+
+    private const int MaxScanDepth = 32;
+
+    // The files to scan below directory. A directory is entered once (by its real location, so a link cycle ends) and
+    // in a stable order. With sources, an entry whose real location is outside the project is not opened and is listed
+    // in unscanned (named relative to root) instead of being skipped silently.
+    private static void Collect(
+        string root,
+        string directory,
+        ContextFileReader? sources,
+        List<string> files,
+        List<UnscannedFile> unscanned,
+        HashSet<string> visited,
+        int depth)
+    {
+        if (depth > MaxScanDepth || !visited.Add(ExportPathGuard.ResolveRealPath(directory, LinkTargetDots.Real)))
+        {
+            return;
+        }
+
+        foreach (var entry in Directory.EnumerateFileSystemEntries(directory).Order(StringComparer.Ordinal))
+        {
+            var isDirectory = Directory.Exists(entry);
+            if (!isDirectory && !ScannedExtensions.Contains(Path.GetExtension(entry)))
+            {
+                continue;
+            }
+
+            if (sources?.FindProblem(entry) is { } problem)
+            {
+                unscanned.Add(new UnscannedFile(Path.GetRelativePath(root, entry).Replace('\\', '/'), $"{problem.Description}; it was not read"));
+            }
+            else if (isDirectory)
+            {
+                Collect(root, entry, sources, files, unscanned, visited, depth + 1);
+            }
+            else
+            {
+                files.Add(entry);
+            }
+        }
     }
 
     // Lines the patterns cannot handle in time are not reported here; ScanDirectoryReport lists them.
