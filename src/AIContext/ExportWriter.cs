@@ -371,7 +371,7 @@ public static class ExportWriter
 
     public static bool IsGenerated(string content)
     {
-        return ContextExporter.NormalizeLineEndings(content)
+        return LineEndings.Normalize(content)
             .Split('\n')
             .Take(HeaderLinesToScan)
             .Any(line => line.Contains(ContextExporter.GeneratedMarker, StringComparison.Ordinal));
@@ -394,7 +394,7 @@ public static class ExportWriter
 
             var bytes = File.ReadAllBytes(path);
             var existing = DecodeText(bytes);
-            if (string.Equals(ContextExporter.NormalizeLineEndings(existing), content, StringComparison.Ordinal))
+            if (string.Equals(LineEndings.Normalize(existing), content, StringComparison.Ordinal))
             {
                 return new ExportFilePlan(targetName, path, content, ExportFileStatus.Unchanged);
             }

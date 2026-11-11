@@ -163,7 +163,7 @@ public static class SecretScanner
     public static IReadOnlyList<SecretFinding> Scan(string fileName, string content)
     {
         var findings = new List<SecretFinding>();
-        var lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var lines = LineEndings.Normalize(content).Split('\n');
         ScanLines(fileName, lines, findings, out _);
         return findings;
     }
