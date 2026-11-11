@@ -37,7 +37,8 @@ public static class RuleLoader
         "architecture", "decisions", "patterns", "constraints", "glossary", "project"
     };
 
-    private static readonly Regex NamePattern = new("^[a-z0-9][a-z0-9_-]*$", RegexOptions.CultureInvariant);
+    // SPEC 4.4: lowercase letters, digits, '-' and '_', at least one character, in any order.
+    private static readonly Regex NamePattern = new(@"^[a-z0-9_-]+\z", RegexOptions.CultureInvariant);
     private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal) { "description", "paths" };
 
     // The rules of a .aicontext directory. Rule files (and the rules directory) that lie outside the project through a
@@ -163,7 +164,13 @@ public static class RuleLoader
             }
             else if (key == "description")
             {
-                if (value.IsList)
+                if (value.Problem is not null)
+                {
+                    diagnostics.Add(Diagnostic.Error(
+                        DiagnosticCodes.InvalidFrontmatter, $"{label}: 'description': {value.Problem}", location));
+                    valid = false;
+                }
+                else if (value.IsList || value.IsNested)
                 {
                     diagnostics.Add(Diagnostic.Error(
                         DiagnosticCodes.InvalidRuleDescription,
@@ -171,24 +178,33 @@ public static class RuleLoader
                         location));
                     valid = false;
                 }
-                else if (!string.IsNullOrWhiteSpace(value.Scalar))
+                else if (string.IsNullOrWhiteSpace(value.Scalar))
                 {
-                    description = value.Scalar!.Trim();
+                    // An empty description would turn an on-demand rule into an always-on one without a word.
+                    diagnostics.Add(Diagnostic.Error(
+                        DiagnosticCodes.EmptyFrontmatterValue,
+                        $"{label}: 'description' is present but empty; write one line, or remove the key.",
+                        location));
+                    valid = false;
+                }
+                else
+                {
+                    description = value.Scalar.Trim();
                 }
             }
             else
             {
-                var entries = value.IsList
-                    ? value.List!
-                    : Frontmatter.SplitTopLevel(value.Scalar ?? string.Empty);
-
-                foreach (var entry in entries)
+                var entries = Frontmatter.ReadItems(value, out var problem);
+                if (entries is null)
                 {
-                    if (entry.Length == 0)
-                    {
-                        continue;
-                    }
+                    diagnostics.Add(Diagnostic.Error(DiagnosticCodes.InvalidFrontmatter, $"{label}: 'paths': {problem}", location));
+                    valid = false;
+                    continue;
+                }
 
+                var before = paths.Count;
+                foreach (var entry in entries.Where(e => e.Length > 0))
+                {
                     if (entry.Contains('\\', StringComparison.Ordinal))
                     {
                         diagnostics.Add(Diagnostic.Error(
@@ -199,6 +215,17 @@ public static class RuleLoader
                     }
 
                     paths.Add(entry);
+                }
+
+                if (paths.Count == before)
+                {
+                    // `paths` is what makes a rule scoped. Without a pattern the rule would apply to nothing, and
+                    // treating it as always-on would silently make it much broader than its author wrote it.
+                    diagnostics.Add(Diagnostic.Error(
+                        DiagnosticCodes.EmptyFrontmatterValue,
+                        $"{label}: 'paths' is present but has no pattern, so the rule would have no scope; list at least one pattern, or remove the key.",
+                        location));
+                    valid = false;
                 }
             }
         }

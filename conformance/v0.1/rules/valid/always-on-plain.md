@@ -1,0 +1,1 @@
+Always format the code.

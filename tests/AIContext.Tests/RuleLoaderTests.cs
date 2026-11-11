@@ -100,6 +100,134 @@ public sealed class RuleLoaderTests : IDisposable
         Assert.Contains(result.Warnings, w => w.Contains("nested", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("---\npaths: []\n---\nBody")]
+    [InlineData("---\npaths:\n---\nBody")]
+    [InlineData("---\npaths: \"\"\n---\nBody")]
+    [InlineData("---\npaths: [\"\"]\n---\nBody")]
+    [InlineData("---\npaths: ,\n---\nBody")]
+    [InlineData("---\npaths: # to be decided\n---\nBody")]
+    public void Load_PathsWithoutAPattern_IsAnErrorAndNeverAnAlwaysOnRule(string content)
+    {
+        WriteRule("ui.md", content);
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        var error = Assert.Single(result.Diagnostics, d => d.IsError);
+        Assert.Equal(DiagnosticCodes.EmptyFrontmatterValue, error.Code);
+        Assert.Equal(".aicontext/rules/ui.md", error.Location);
+    }
+
+    [Theory]
+    [InlineData("---\ndescription:\n---\nBody")]
+    [InlineData("---\ndescription: \"  \"\npaths: [\"src/**\"]\n---\nBody")]
+    public void Load_EmptyDescription_IsAnErrorEvenNextToValidPaths(string content)
+    {
+        WriteRule("ui.md", content);
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        Assert.Equal(DiagnosticCodes.EmptyFrontmatterValue, Assert.Single(result.Diagnostics, d => d.IsError).Code);
+    }
+
+    [Theory]
+    [InlineData("_team.md")]
+    [InlineData("-team.md")]
+    [InlineData("team_.md")]
+    [InlineData("-.md")]
+    [InlineData("2024-rules.md")]
+    public void Load_AcceptsEveryNameTheSpecificationAllows(string fileName)
+    {
+        WriteRule(fileName, "Body");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(fileName[..^3], Assert.Single(result.Rules).Name);
+    }
+
+    [Theory]
+    [InlineData(".md")]
+    [InlineData("a.b.md")]
+    [InlineData("Team.md")]
+    [InlineData("my rule.md")]
+    public void Load_RejectsNamesOutsideTheAllowedCharacters(string fileName)
+    {
+        WriteRule(fileName, "Body");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        Assert.Equal(DiagnosticCodes.InvalidRuleName, Assert.Single(result.Diagnostics, d => d.IsError).Code);
+    }
+
+    [Fact]
+    public void Load_UnknownKeyWithANestedValue_WarnsAndKeepsTheRule()
+    {
+        WriteRule("ui.md", "---\nowner:\n  team: web\npaths: [\"src/**\"]\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(["src/**"], Assert.Single(result.Rules).Paths);
+        Assert.Equal(DiagnosticCodes.UnknownFrontmatterKey, Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void Load_RepeatedKey_IsAFrontmatterErrorAndTheRuleIsNotLoaded()
+    {
+        WriteRule("ui.md", "---\npaths: src/**\npaths: lib/**\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        Assert.Equal(DiagnosticCodes.InvalidFrontmatter, Assert.Single(result.Diagnostics, d => d.IsError).Code);
+    }
+
+    [Theory]
+    [InlineData("---\npaths:\n  src: ui\n---\nBody", DiagnosticCodes.InvalidFrontmatter)]
+    [InlineData("---\npaths: \"src/**\" lib/**\n---\nBody", DiagnosticCodes.InvalidFrontmatter)]
+    [InlineData("---\npaths: src/**, \"lib/**\"\n---\nBody", DiagnosticCodes.InvalidFrontmatter)]
+    [InlineData("---\ndescription: >\n  long\n---\nBody", DiagnosticCodes.InvalidRuleDescription)]
+    [InlineData("---\ndescription: \"open\n---\nBody", DiagnosticCodes.InvalidFrontmatter)]
+    public void Load_UnusableValueOfAKnownKey_IsAnErrorAndTheRuleIsNotLoaded(string content, string expectedCode)
+    {
+        WriteRule("ui.md", content);
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        Assert.Equal(expectedCode, Assert.Single(result.Diagnostics, d => d.IsError).Code);
+    }
+
+    [Fact]
+    public void Load_ValueOfAnUnknownKeyIsNotInterpreted()
+    {
+        WriteRule("ui.md", "---\nowner: \"not closed\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Errors);
+        Assert.Single(result.Rules);
+    }
+
+    [Fact]
+    public void Load_CommentsAndQuotingGiveTheSamePatternsAsThePlainForms()
+    {
+        WriteRule("a.md", "---\npaths: src/**, lib/** # source\n---\nBody");
+        WriteRule("b.md", "---\npaths: \"src/**, lib/**\"\n---\nBody");
+        WriteRule("c.md", "---\npaths: [\"src/**\", lib/**,]\n---\nBody");
+        WriteRule("d.md", "---\npaths:\n  - src/** # source\n  - \"lib/**\"\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Errors);
+        Assert.All(result.Rules, rule => Assert.Equal(["src/**", "lib/**"], rule.Paths));
+        Assert.Equal(4, result.Rules.Count);
+    }
+
     private void WriteRule(string fileName, string content)
     {
         File.WriteAllText(Path.Combine(_contextDirectory, "rules", fileName), content);

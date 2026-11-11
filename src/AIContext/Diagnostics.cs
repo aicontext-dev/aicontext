@@ -48,6 +48,7 @@ public static class DiagnosticCodes
     public const string InvalidRuleDescription = "AIC2004";
     public const string InvalidRulePathSeparator = "AIC2005";
     public const string UnreadableRuleFile = "AIC2006";
+    public const string EmptyFrontmatterValue = "AIC2007";
     public const string IgnoredRuleDirectory = "AIC2101";
     public const string IgnoredRuleFile = "AIC2102";
     public const string UnknownFrontmatterKey = "AIC2103";

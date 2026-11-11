@@ -221,7 +221,7 @@ paths: ["src/ui/**", "**/*.tsx"]
 Use the shared design-system components.
 ```
 
-- `paths` set: the rule applies only when working with matching files. Only `description` set: the agent loads it when relevant. Neither: always on.
+- `paths` set: the rule applies only when working with matching files. Only `description` set: the agent loads it when relevant. Neither: always on. A key that is present but empty (`paths: []`, `description:`) is an error, never a quiet always-on rule. The header is a small, strict subset of YAML ([SPEC 4.4.1](./SPEC.md), with [conformance fixtures](./conformance/README.md)).
 - In the split layout `README.md` and `constraints.md` stay always on; scoped and on-demand content is exported as native rule files (Cursor `.mdc`, Copilot `.instructions.md`, Claude `.claude/rules`, Windsurf/Devin rules). Where a tool cannot scope content (AGENTS.md, Aider, and on-demand content in Copilot and Claude) it stays in the main file.
 - Generated rule files are named `aicontext-<name>` and are removed when their source disappears; your own rule files are never touched.
 - `devin` is opt-in (not part of the default `all` set) because Devin also loads `.windsurf/rules`.
