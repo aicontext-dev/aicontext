@@ -31,7 +31,8 @@ public static class ContextValidator
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MissingRequiredFile, $"Missing required file: {readmePath}", readmeLocation));
         }
-        else if (string.IsNullOrWhiteSpace(File.ReadAllText(readmePath)))
+        else if (ContextFileReader.TryReadAllText(readmePath, DiagnosticCodes.UnreadableContextFile, readmeLocation, diagnostics) is { } readme &&
+                 string.IsNullOrWhiteSpace(readme))
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.EmptyReadme, $"{readmePath} is empty.", readmeLocation));
         }
@@ -41,11 +42,11 @@ public static class ContextValidator
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.MissingRequiredFile, $"Missing required file: {contextPath}", contextLocation));
         }
-        else
+        else if (ContextFileReader.TryReadAllText(contextPath, DiagnosticCodes.UnreadableContextFile, contextLocation, diagnostics) is { } contextText)
         {
             try
             {
-                using var document = JsonDocument.Parse(File.ReadAllText(contextPath));
+                using var document = JsonDocument.Parse(contextText);
                 root = document.RootElement.Clone();
             }
             catch (JsonException ex)
@@ -210,28 +211,38 @@ public static class ContextValidator
         }
     }
 
-    // Returns true when all recommended files exist and are non-empty (Extended profile, SPEC 8.2).
+    // Returns true when all recommended files exist and are non-empty (Extended profile, SPEC 8.2). A file that
+    // cannot be read is an error, not a missing file: the validator cannot tell what it contains.
     private static bool ValidateRecommendedFiles(string contextDirectory, List<Diagnostic> diagnostics)
     {
         var allPresent = true;
         foreach (var fileName in RecommendedFiles)
         {
             var path = Path.Combine(contextDirectory, fileName);
+            var location = $"{ContextDirectoryName}/{fileName}";
             if (!File.Exists(path))
             {
                 diagnostics.Add(Diagnostic.Warning(
                     DiagnosticCodes.RecommendedFileMissing,
                     $"Recommended file missing: .aicontext/{fileName}.",
-                    $"{ContextDirectoryName}/{fileName}"));
+                    location));
                 allPresent = false;
             }
-            else if (string.IsNullOrWhiteSpace(File.ReadAllText(path)))
+            else
             {
-                diagnostics.Add(Diagnostic.Warning(
-                    DiagnosticCodes.RecommendedFileEmpty,
-                    $"Recommended file is empty: .aicontext/{fileName}.",
-                    $"{ContextDirectoryName}/{fileName}"));
-                allPresent = false;
+                var content = ContextFileReader.TryReadAllText(path, DiagnosticCodes.UnreadableContextFile, location, diagnostics);
+                if (content is null)
+                {
+                    allPresent = false;
+                }
+                else if (string.IsNullOrWhiteSpace(content))
+                {
+                    diagnostics.Add(Diagnostic.Warning(
+                        DiagnosticCodes.RecommendedFileEmpty,
+                        $"Recommended file is empty: .aicontext/{fileName}.",
+                        location));
+                    allPresent = false;
+                }
             }
         }
 

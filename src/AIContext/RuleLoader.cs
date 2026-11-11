@@ -51,7 +51,25 @@ public static class RuleLoader
             return new RuleLoadResult(rules, diagnostics);
         }
 
-        foreach (var directory in Directory.EnumerateDirectories(rulesDirectory))
+        string[] subdirectories;
+        string[] files;
+        try
+        {
+            subdirectories = Directory.EnumerateDirectories(rulesDirectory).ToArray();
+            files = Directory.EnumerateFiles(rulesDirectory)
+                .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            diagnostics.Add(Diagnostic.Error(
+                DiagnosticCodes.UnreadableRuleFile,
+                $"{rulesDirectory} could not be listed ({ex.Message}). Check that you have permission to read it.",
+                ".aicontext/rules"));
+            return new RuleLoadResult(rules, diagnostics);
+        }
+
+        foreach (var directory in subdirectories)
         {
             var name = Path.GetFileName(directory);
             diagnostics.Add(Diagnostic.Warning(
@@ -59,9 +77,6 @@ public static class RuleLoader
                 $"rules/{name}/: subdirectories are ignored; rules must be directly in .aicontext/rules/.",
                 $".aicontext/rules/{name}"));
         }
-
-        var files = Directory.EnumerateFiles(rulesDirectory)
-            .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal);
 
         foreach (var file in files)
         {
@@ -109,7 +124,13 @@ public static class RuleLoader
             valid = false;
         }
 
-        var parsed = Frontmatter.Parse(File.ReadAllText(path));
+        var text = ContextFileReader.TryReadAllText(path, DiagnosticCodes.UnreadableRuleFile, location, diagnostics);
+        if (text is null)
+        {
+            return null;
+        }
+
+        var parsed = Frontmatter.Parse(text);
         if (parsed.Error is not null)
         {
             diagnostics.Add(Diagnostic.Error(DiagnosticCodes.InvalidFrontmatter, $"{label}: {parsed.Error}", location));

@@ -130,31 +130,31 @@ public sealed class CliApp
         }
 
         var result = ProjectInitializer.Initialize(basePath, projectName, profile, CanonicalSchemaUrl, ExpectedSpecVersion, force);
+
+        // Only what was really written is reported as created, also when init stopped halfway.
+        foreach (var created in result.Created)
+        {
+            _out.WriteLine($"Created: {created}");
+        }
+
         if (result.HasErrors)
         {
             WriteErrors(result.Diagnostics);
-            _err.WriteLine("No files were written.");
+            _err.WriteLine(result.Created.Count == 0
+                ? "No files were written."
+                : $"Only {result.Created.Count} file(s) were written. init is not a transaction and nothing is rolled back: " +
+                  "fix the cause and run 'aicontext init --force' to write them all again (it overwrites only the files init creates).");
             return 1;
         }
 
         if (result.Conflicts.Count > 0)
         {
-            foreach (var created in result.Created)
-            {
-                _out.WriteLine($"Created: {created}");
-            }
-
             foreach (var conflict in result.Conflicts)
             {
                 _err.WriteLine($"File already exists: {conflict}. Use --force to overwrite.");
             }
 
             return 1;
-        }
-
-        foreach (var created in result.Created)
-        {
-            _out.WriteLine($"Created: {created}");
         }
 
         _out.WriteLine("Next: replace the TODO placeholders in .aicontext/ with real content; 'aicontext validate' reports them until you do.");
@@ -235,12 +235,17 @@ public sealed class CliApp
             _out.WriteLine($"Using exports.defaultTarget '{plan.DefaultTargetUsed}' from .aicontext/context.json.");
         }
 
-        foreach (var file in plan.Files)
+        // A plan is only announced as a plan ("Would ..."); what was written is reported after it was written.
+        if (preview || plan.HasErrors)
         {
-            _out.WriteLine($"{DescribeStatus(file.Status, preview || plan.HasErrors)} ({file.Target}): {file.Path}");
+            foreach (var file in plan.Files)
+            {
+                _out.WriteLine($"{DescribeStatus(file.Status, preview: true)} ({file.Target}): {file.Path}");
+            }
+
+            WriteOrphanedTargetWarnings(plan.Diagnostics);
         }
 
-        WriteOrphanedTargetWarnings(plan.Diagnostics);
         if (plan.HasErrors)
         {
             WriteErrors(plan.Diagnostics);
@@ -276,17 +281,42 @@ public sealed class CliApp
         }
 
         var result = ExportService.Apply(plan);
+        WriteApplied(plan, result);
+        WriteOrphanedTargetWarnings(plan.Diagnostics);
         if (result.HasErrors)
         {
             WriteErrors(result.Diagnostics);
             _err.WriteLine(result.Changed == 0
                 ? "No files were written."
-                : $"{result.Changed} file(s) were already written. Run 'aicontext export' again.");
+                : $"Only {result.Changed} of {changed} changed file(s) were written; the others were not touched. " +
+                  "An export is not a transaction and nothing is rolled back: fix the cause and run 'aicontext export' again, it starts from the files as they are now.");
             return 1;
         }
 
         _out.WriteLine($"Export completed ({result.Changed} changed, {result.Unchanged} unchanged).");
         return 0;
+    }
+
+    // What really happened, in plan order: files that were written or removed, files that were already up to date,
+    // and, after a failure, the planned changes that were not made.
+    private void WriteApplied(ExportPlan plan, ExportResult result)
+    {
+        var written = new HashSet<ExportFilePlan>(result.Written, ReferenceEqualityComparer.Instance);
+        foreach (var file in plan.Files)
+        {
+            if (file.Status == ExportFileStatus.Unchanged)
+            {
+                _out.WriteLine($"Unchanged ({file.Target}): {file.Path}");
+            }
+            else if (written.Contains(file))
+            {
+                _out.WriteLine($"{DescribeStatus(file.Status, preview: false)} ({file.Target}): {file.Path}");
+            }
+            else
+            {
+                _out.WriteLine($"Not written ({file.Target}): {file.Path}");
+            }
+        }
     }
 
     // Context problems (1xxx and 2xxx) are the ones 'aicontext validate' reports as well.

@@ -10,8 +10,10 @@ public enum InitProfile
 }
 
 // Created are the files written. Conflicts are files that exist and were not overwritten (no --force, or a file that
-// appeared while init was running). Diagnostics explain a refusal: a destination that leaves the project, or enters a
-// separate one, through a link (AIC4102, AIC4104); nothing is written then.
+// appeared while init was running). Diagnostics explain a refusal or a failure: a destination that leaves the project,
+// or enters a separate one, through a link (AIC4102, AIC4104), a directory where a file has to go (AIC4105) or a file
+// that cannot be written (AIC4106). When the problem is known beforehand nothing is written; when a write fails
+// midway, Created lists what was already written (init is not a transaction).
 public sealed record InitResult(IReadOnlyList<string> Created, IReadOnlyList<string> Conflicts)
 {
     public IReadOnlyList<Diagnostic> Diagnostics { get; init; } = [];
@@ -114,10 +116,13 @@ public static class ProjectInitializer
     }
 
     // Writes nothing and reports the problem when a destination leaves the project through a link (even with force:
-    // force allows overwriting, not writing somewhere else) or when any target file exists and force is not set.
-    // Every destination is checked, with the guard that protects export (D12), before the first file is written. A
-    // new file is created exclusively, so one that appeared after the check is never overwritten; init then stops
-    // and reports it as a conflict (files written before it stay).
+    // force allows overwriting, not writing somewhere else), when a directory is in the way of a file (or a file in
+    // the way of a directory), when a file that force would overwrite cannot be written, or when any target file
+    // exists and force is not set. Every destination is checked, with the guard that protects export (D12), before
+    // the first file is written. A new file is created exclusively, so one that appeared after the check is never
+    // overwritten; init then stops and reports it as a conflict. An existing file is replaced through a temporary
+    // file. If a write still fails midway (locked in the meantime, no space), the files written before it stay and
+    // are listed in Created: init is not a transaction.
     public static InitResult Initialize(
         string basePath,
         string projectName,
@@ -133,10 +138,14 @@ public static class ProjectInitializer
         var blocked = new List<Diagnostic>();
         foreach (var path in files.Keys)
         {
-            if (guard.FindProblem(path) is { } problem)
+            var location = Path.GetRelativePath(basePath, path).Replace('\\', '/');
+            if (guard.FindWriteProblem(path) is { } problem)
             {
-                var location = Path.GetRelativePath(basePath, path).Replace('\\', '/');
                 blocked.Add(ExportWriter.BlockedDiagnostic(path, problem.Description, problem.Code, location, "Init never writes"));
+            }
+            else if (force && File.Exists(path) && ExportWriter.FindWriteBlock(path) is { } cannotWrite)
+            {
+                blocked.Add(ExportWriter.BlockedDiagnostic(path, $"cannot be overwritten ({cannotWrite})", DiagnosticCodes.FileAccessFailed, location));
             }
         }
 
@@ -151,20 +160,29 @@ public static class ProjectInitializer
             return new InitResult([], existing);
         }
 
-        Directory.CreateDirectory(contextDirectory);
         var created = new List<string>();
-        foreach (var (path, content) in files)
+        var current = contextDirectory;
+        try
         {
-            if (existing.Contains(path))
+            Directory.CreateDirectory(contextDirectory);
+            foreach (var (path, content) in files)
             {
-                File.WriteAllText(path, content, new UTF8Encoding(false));
-            }
-            else if (!ExportWriter.TryCreateNew(path, content))
-            {
-                return new InitResult(created, [path]);
-            }
+                current = path;
+                if (existing.Contains(path))
+                {
+                    ExportWriter.ReplaceExisting(path, content);
+                }
+                else if (!ExportWriter.TryCreateNew(path, content))
+                {
+                    return new InitResult(created, [path]);
+                }
 
-            created.Add(path);
+                created.Add(path);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new InitResult(created, []) { Diagnostics = [ExportWriter.WriteFailed(current, "written", ex, basePath)] };
         }
 
         return new InitResult(created, []);

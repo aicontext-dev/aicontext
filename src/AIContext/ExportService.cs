@@ -24,9 +24,15 @@ public sealed record ExportPlan(
     public int ChangedCount => Files.Count(f => f.Status is ExportFileStatus.Created or ExportFileStatus.Updated or ExportFileStatus.Deleted);
 }
 
+// Changed counts the files this call really wrote or removed (Written lists them in order) and Unchanged the files
+// that already had the planned content. When applying stopped early, Diagnostics says why, Written holds what was
+// completed before the failure, and the rest of the plan was not touched: an export is a sequence of single-file
+// writes, not a transaction, and planning again from the files on disk finishes the job.
 public sealed record ExportResult(int Changed, int Unchanged)
 {
-    // Set when applying stopped because the plan was out of date or unsafe; Changed then counts what was already written.
+    public IReadOnlyList<ExportFilePlan> Written { get; init; } = [];
+
+    // Set when applying stopped because the plan was out of date, unsafe or a write failed.
     public IReadOnlyList<Diagnostic> Diagnostics { get; init; } = [];
 
     public bool HasErrors => Diagnostics.Any(d => d.IsError);
@@ -152,7 +158,15 @@ public static class ExportService
     // Writes a plan that has no errors; a plan with errors is refused, so nothing is ever written partially
     // because of a problem the plan already knew about. A plan can go stale (a file or a link changed since
     // planning, which matters when a person reviews it for a while): every file is verified again first, and if
-    // anything differs nothing is written and the result carries the errors.
+    // anything differs, cannot be written or has a directory in its way, nothing is written and the result carries
+    // the errors.
+    //
+    // After that the files are written one by one, and each write is safe on its own (a new file is created
+    // exclusively, an existing one is replaced through a temporary file). The whole is not a transaction: if a write
+    // fails (locked, no permission, no space), writing stops, the failure is a diagnostic, and the result lists what
+    // was already written (Written); those files stay. Nothing is rolled back and the later files are untouched.
+    // Planning again from the files on disk and applying finishes the job. An unexpected exception, which is a bug,
+    // is not caught.
     public static ExportResult Apply(ExportPlan plan)
     {
         if (plan.HasErrors)
@@ -160,6 +174,7 @@ public static class ExportService
             throw new InvalidOperationException("The export plan has errors; nothing is written.");
         }
 
+        var unchanged = plan.Files.Count(file => file.Status == ExportFileStatus.Unchanged);
         var guard = new ExportPathGuard(plan.BasePath);
         var problems = plan.Files
             .Select(file => ExportWriter.Verify(file, guard, plan.BasePath))
@@ -167,10 +182,15 @@ public static class ExportService
             .ToList();
         if (problems.Count > 0)
         {
-            return new ExportResult(0, plan.Files.Count) { Diagnostics = problems };
+            return new ExportResult(0, unchanged) { Diagnostics = problems };
         }
 
-        var written = 0;
+        var written = new List<ExportFilePlan>();
+        // An empty result keeps the default (shared) empty list, so results without writes compare equal.
+        IReadOnlyList<ExportFilePlan> Done() => written.Count == 0 ? [] : written.ToArray();
+        ExportResult Stopped(Diagnostic problem) =>
+            new(written.Count, unchanged) { Written = Done(), Diagnostics = [problem] };
+
         foreach (var file in plan.Files)
         {
             try
@@ -180,19 +200,20 @@ public static class ExportService
             catch (StaleExportPlanException ex)
             {
                 var location = Path.GetRelativePath(plan.BasePath, ex.FilePath).Replace('\\', '/');
-                return new ExportResult(written, plan.Files.Count - written)
-                {
-                    Diagnostics = [ExportWriter.StalePlan(ex.FilePath, location, "was created after the export was planned")]
-                };
+                return Stopped(ExportWriter.StalePlan(ex.FilePath, location, ex.Reason));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return Stopped(ExportWriter.WriteFailed(file, ex, plan.BasePath));
             }
 
             if (file.Status is ExportFileStatus.Created or ExportFileStatus.Updated or ExportFileStatus.Deleted)
             {
-                written++;
+                written.Add(file);
             }
         }
 
-        return new ExportResult(plan.ChangedCount, plan.Files.Count - plan.ChangedCount);
+        return new ExportResult(written.Count, unchanged) { Written = Done() };
     }
 
     // How much context each tool would load and whether the exports are in sync, for every configured target.

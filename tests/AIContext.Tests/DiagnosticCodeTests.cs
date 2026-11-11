@@ -266,4 +266,43 @@ public sealed class DiagnosticCodeTests : IDisposable
 
         Assert.Equal(".aicontext/glossary.md", diagnostic.Location);
     }
+
+    [Theory]
+    [InlineData("README.md")]
+    [InlineData("context.json")]
+    [InlineData("architecture.md")]
+    [InlineData("constraints.md")]
+    public void Validate_LockedContextFile_ReportsAIC1007InsteadOfThrowing(string fileName)
+    {
+        using var locked = TestFiles.Lock(Path.Combine(_root, ".aicontext", fileName));
+
+        var diagnostic = Single(Validate(), DiagnosticCodes.UnreadableContextFile);
+
+        Assert.True(diagnostic.IsError);
+        Assert.Equal($".aicontext/{fileName}", diagnostic.Location);
+        Assert.Contains("could not be read", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Validate_LockedRuleFile_ReportsAIC2006InsteadOfThrowing()
+    {
+        WriteRule("ui.md", "---\ndescription: UI\n---\nBody.");
+
+        using var locked = TestFiles.Lock(Path.Combine(_root, ".aicontext", "rules", "ui.md"));
+        var diagnostic = Single(Validate(), DiagnosticCodes.UnreadableRuleFile);
+
+        Assert.True(diagnostic.IsError);
+        Assert.Equal(".aicontext/rules/ui.md", diagnostic.Location);
+    }
+
+    [Fact]
+    public void Load_LockedReadme_ReturnsTheDiagnosticAndNoContext()
+    {
+        using var locked = TestFiles.Lock(Path.Combine(_root, ".aicontext", "README.md"));
+
+        var load = ContextLoader.Load(_root);
+
+        Assert.Null(load.Loaded);
+        Assert.Contains(load.Diagnostics, d => d.IsError && d.Code == DiagnosticCodes.UnreadableContextFile);
+    }
 }

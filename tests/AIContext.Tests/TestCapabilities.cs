@@ -12,7 +12,15 @@ public enum LinkCapability
     // A directory in which paths that differ only by letter case are different entries.
     CaseSensitiveDirectory,
     // A directory in which paths that differ only by letter case are the same entry (the default on Windows and macOS).
-    CaseInsensitiveDirectory
+    CaseInsensitiveDirectory,
+    // A file with the read-only attribute really cannot be opened for writing by this account. A privileged Unix
+    // account ignores it.
+    ReadOnlyFile,
+    // A directory without write permission really does not allow creating a file in it (Unix permission bits; a
+    // privileged account ignores them).
+    ReadOnlyDirectory,
+    // Unix permission bits (File.GetUnixFileMode); not available on Windows.
+    UnixFileMode
 }
 
 // Probes the capabilities once per test run, in a temporary directory, without changing host settings.
@@ -29,6 +37,9 @@ internal static class TestCapabilities
         LinkCapability.DirectorySymlink => "directory-symlink",
         LinkCapability.CaseSensitiveDirectory => "case-sensitive-directory",
         LinkCapability.CaseInsensitiveDirectory => "case-insensitive-directory",
+        LinkCapability.ReadOnlyFile => "read-only-file",
+        LinkCapability.ReadOnlyDirectory => "read-only-directory",
+        LinkCapability.UnixFileMode => "unix-file-mode",
         _ => throw new ArgumentOutOfRangeException(nameof(capability))
     };
 
@@ -65,7 +76,10 @@ internal static class TestCapabilities
                 [LinkCapability.FileSymlink] = ProbeFileSymlink(directory),
                 [LinkCapability.DirectorySymlink] = ProbeDirectorySymlink(directory),
                 [LinkCapability.CaseSensitiveDirectory] = ProbeCaseSensitiveDirectory(directory),
-                [LinkCapability.CaseInsensitiveDirectory] = ProbeCaseInsensitiveDirectory(directory)
+                [LinkCapability.CaseInsensitiveDirectory] = ProbeCaseInsensitiveDirectory(directory),
+                [LinkCapability.ReadOnlyFile] = ProbeReadOnlyFile(directory),
+                [LinkCapability.ReadOnlyDirectory] = ProbeReadOnlyDirectory(directory),
+                [LinkCapability.UnixFileMode] = OperatingSystem.IsWindows() ? "Windows has no Unix permission bits" : null
             };
         }
         finally
@@ -145,6 +159,58 @@ internal static class TestCapabilities
             ? null
             : "the temporary directory distinguishes paths that differ only by letter case";
     }
+
+    private static string? ProbeReadOnlyFile(string directory)
+    {
+        var file = Path.Combine(directory, "read-only.txt");
+        File.WriteAllText(file, "probe");
+        File.SetAttributes(file, FileAttributes.ReadOnly);
+        try
+        {
+            using (new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+            {
+            }
+
+            return "this account can write to a read-only file";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        finally
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+    }
+
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    private static string? ProbeReadOnlyDirectoryUnix(string directory)
+    {
+        var probe = Path.Combine(directory, "read-only-directory");
+        Directory.CreateDirectory(probe);
+        File.SetUnixFileMode(probe, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            using (new FileStream(Path.Combine(probe, "probe.txt"), FileMode.CreateNew, FileAccess.Write))
+            {
+            }
+
+            return "this account can create files in a directory without write permission";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        finally
+        {
+            File.SetUnixFileMode(probe, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    private static string? ProbeReadOnlyDirectory(string directory) =>
+        OperatingSystem.IsWindows()
+            ? "directories have no write permission bit on Windows"
+            : ProbeReadOnlyDirectoryUnix(directory);
 }
 
 // xunit 2.x has no way to skip from inside a test; the reason is decided while the test is discovered, so a

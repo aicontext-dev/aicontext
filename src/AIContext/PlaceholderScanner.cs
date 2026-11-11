@@ -36,9 +36,17 @@ public static class PlaceholderScanner
         var rulesDirectory = Path.Combine(contextDirectory, RuleLoader.RulesDirectoryName);
         if (Directory.Exists(rulesDirectory))
         {
-            files.AddRange(Directory.EnumerateFiles(rulesDirectory, "*.md")
-                .OrderBy(f => f, StringComparer.Ordinal)
-                .Select(f => ($"{RuleLoader.RulesDirectoryName}/{System.IO.Path.GetFileName(f)}", f)));
+            try
+            {
+                files.AddRange(Directory.EnumerateFiles(rulesDirectory, "*.md")
+                    .OrderBy(f => f, StringComparer.Ordinal)
+                    .Select(f => ($"{RuleLoader.RulesDirectoryName}/{System.IO.Path.GetFileName(f)}", f))
+                    .ToList());
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The rule loader reports a rules directory that cannot be listed (AIC2006).
+            }
         }
 
         foreach (var (name, path) in files)

@@ -61,9 +61,19 @@ public static class SecretScanner
             return new SecretScanReport(findings, unscanned);
         }
 
-        var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
-            .Where(f => ScannedExtensions.Contains(Path.GetExtension(f)))
-            .OrderBy(f => f, StringComparer.Ordinal);
+        List<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+                .Where(f => ScannedExtensions.Contains(Path.GetExtension(f)))
+                .OrderBy(f => f, StringComparer.Ordinal)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            unscanned.Add(new UnscannedFile(string.Empty, $"the directory could not be listed ({ex.Message})"));
+            return new SecretScanReport(findings, unscanned);
+        }
 
         foreach (var file in files)
         {

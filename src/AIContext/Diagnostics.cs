@@ -32,6 +32,7 @@ public static class DiagnosticCodes
     public const string SchemaViolation = "AIC1004";
     public const string ProjectNameWhitespace = "AIC1005";
     public const string DefaultTargetNotInTargets = "AIC1006";
+    public const string UnreadableContextFile = "AIC1007";
     public const string MissingSchemaProperty = "AIC1101";
     public const string SchemaUrlMismatch = "AIC1102";
     public const string WindsurfDevinOverlap = "AIC1103";
@@ -45,6 +46,7 @@ public static class DiagnosticCodes
     public const string InvalidFrontmatter = "AIC2003";
     public const string InvalidRuleDescription = "AIC2004";
     public const string InvalidRulePathSeparator = "AIC2005";
+    public const string UnreadableRuleFile = "AIC2006";
     public const string IgnoredRuleDirectory = "AIC2101";
     public const string IgnoredRuleFile = "AIC2102";
     public const string UnknownFrontmatterKey = "AIC2103";
@@ -62,6 +64,8 @@ public static class DiagnosticCodes
     public const string PathOutsideProject = "AIC4102";
     public const string StaleExportPlan = "AIC4103";
     public const string PathInSeparateProject = "AIC4104";
+    public const string DestinationNotAFile = "AIC4105";
+    public const string FileAccessFailed = "AIC4106";
     public const string OrphanedTargetExport = "AIC4201";
 }
 

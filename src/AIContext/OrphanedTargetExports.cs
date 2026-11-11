@@ -53,14 +53,22 @@ internal static class OrphanedTargetExports
             var directory = ExportTarget.ResolveRelative(basePath, target.RuleDirectory);
             if (Directory.Exists(directory))
             {
-                foreach (var file in Directory.EnumerateFiles(directory))
+                try
                 {
-                    var name = Path.GetFileName(file);
-                    if (name.StartsWith(ExportTargets.GeneratedRulePrefix, StringComparison.Ordinal) &&
-                        name.EndsWith(target.RuleExtension, StringComparison.Ordinal))
+                    foreach (var file in Directory.EnumerateFiles(directory).ToList())
                     {
-                        candidates.Add(file);
+                        var name = Path.GetFileName(file);
+                        if (name.StartsWith(ExportTargets.GeneratedRulePrefix, StringComparison.Ordinal) &&
+                            name.EndsWith(target.RuleExtension, StringComparison.Ordinal))
+                        {
+                            candidates.Add(file);
+                        }
                     }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // This only reports leftovers of targets that are not exported and never blocks anything, so a
+                    // directory that cannot be listed is skipped (the same as a file that cannot be read below).
                 }
             }
         }

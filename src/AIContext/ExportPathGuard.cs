@@ -61,6 +61,35 @@ internal sealed class ExportPathGuard
         }
     }
 
+    // FindProblem plus the collisions that make the file impossible to write. Used for every file that is about to be
+    // written, so such a destination is known before anything is written. The collision is looked at first: it only
+    // asks whether something exists, and its message is the one that tells the user what to move.
+    public PathProblem? FindWriteProblem(string path) => FindCollision(path) ?? FindProblem(path);
+
+    // A destination that cannot become a regular file: a directory is already there, or one of the directories above
+    // it is a file. What is really on disk decides, not links (FindProblem covers those).
+    public PathProblem? FindCollision(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (Directory.Exists(full))
+        {
+            return new PathProblem(DiagnosticCodes.DestinationNotAFile, "is a directory, but a file has to be written there");
+        }
+
+        for (var directory = Path.GetDirectoryName(full); directory is not null; directory = Path.GetDirectoryName(directory))
+        {
+            // A link is not a file here: File.Exists is also true for a dangling link on Unix, and where a link
+            // leads is decided by FindProblem.
+            if (File.Exists(directory) && new FileInfo(directory).LinkTarget is null)
+            {
+                var shown = Path.GetRelativePath(_root, directory).Replace('\\', '/');
+                return new PathProblem(DiagnosticCodes.DestinationNotAFile, $"cannot be written because '{shown}' is a file, not a directory");
+            }
+        }
+
+        return null;
+    }
+
     private string RealRoot(LinkTargetDots dots)
     {
         if (!_realRoots.TryGetValue(dots, out var realRoot))
