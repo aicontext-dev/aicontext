@@ -21,4 +21,7 @@
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" Version="9.6.0" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AIContext.Tests" />
+  </ItemGroup>
 </Project>

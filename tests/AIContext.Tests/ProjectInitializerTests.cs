@@ -379,6 +379,91 @@ public sealed class ProjectInitializerTests : IDisposable
         Assert.True(File.Exists(Path.Combine(contextDirectory, "context.json")));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Initialize_OutputPathIsADirectory_ReportsAIC4105AndWritesNothing(bool force)
+    {
+        var contextDirectory = CreateContextDirectory();
+        Directory.CreateDirectory(Path.Combine(contextDirectory, "context.json"));
+
+        var result = Init(InitProfile.Extended, force);
+
+        var problem = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.DestinationNotAFile, problem.Code);
+        Assert.Equal(".aicontext/context.json", problem.Location);
+        Assert.Contains("is a directory", problem.Message);
+        Assert.Empty(result.Created);
+        Assert.Equal(["context.json"], TestLinks.Entries(contextDirectory));
+    }
+
+    [Fact]
+    public void Initialize_ContextDirectoryIsAFile_ReportsAIC4105AndKeepsTheFile()
+    {
+        var path = Path.Combine(_basePath, ".aicontext");
+        File.WriteAllText(path, "not a directory");
+
+        var result = Init(InitProfile.Core, force: true);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCodes.DestinationNotAFile && d.Message.Contains("'.aicontext' is a file"));
+        Assert.Empty(result.Created);
+        Assert.Equal("not a directory", File.ReadAllText(path));
+    }
+
+    // The locked file is the first one init would write, but nothing is written: it is known before the first write.
+    [Fact]
+    public void Initialize_ForceAndAFileIsLocked_ReportsAIC4106AndWritesNothing()
+    {
+        var contextDirectory = CreateContextDirectory();
+        var readme = Path.Combine(contextDirectory, "README.md");
+        var context = Path.Combine(contextDirectory, "context.json");
+        File.WriteAllText(readme, "mine");
+        File.WriteAllText(context, "{}");
+
+        InitResult result;
+        using (TestFiles.Lock(readme))
+        {
+            result = Init(InitProfile.Core, force: true);
+        }
+
+        var problem = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.FileAccessFailed, problem.Code);
+        Assert.Equal(".aicontext/README.md", problem.Location);
+        Assert.Empty(result.Created);
+        Assert.Equal("mine", File.ReadAllText(readme));
+        Assert.Equal("{}", File.ReadAllText(context));
+    }
+
+    [LinkFact(LinkCapability.ReadOnlyFile)]
+    public void Initialize_ForceAndAFileIsReadOnly_ReportsAIC4106AndKeepsItsContent()
+    {
+        var contextDirectory = CreateContextDirectory();
+        var readme = Path.Combine(contextDirectory, "README.md");
+        File.WriteAllText(readme, "mine");
+
+        InitResult result;
+        using (TestFiles.ReadOnlyFile(readme))
+        {
+            result = Init(InitProfile.Core, force: true);
+        }
+
+        Assert.Equal(DiagnosticCodes.FileAccessFailed, Assert.Single(result.Diagnostics).Code);
+        Assert.Equal("mine", File.ReadAllText(readme));
+        Assert.False(File.Exists(Path.Combine(contextDirectory, "context.json")));
+    }
+
+    [Fact]
+    public void Initialize_ForceOverExistingFiles_LeavesNoTemporaryFile()
+    {
+        var contextDirectory = CreateContextDirectory();
+        File.WriteAllText(Path.Combine(contextDirectory, "README.md"), "mine");
+
+        var result = Init(InitProfile.Core, force: true);
+
+        Assert.False(result.HasErrors);
+        Assert.Equal(["README.md", "context.json"], TestLinks.Entries(contextDirectory));
+    }
+
     private static void AssertRefused(InitResult result, string code)
     {
         Assert.True(result.HasErrors);

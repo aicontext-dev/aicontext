@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using AIContext.Cli;
 using Xunit;
 
@@ -626,5 +627,130 @@ public sealed class CliAppTests : IDisposable
         WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "targets": ["agents"] } }""");
 
         Assert.DoesNotContain("Overlap:", Run("status").Output);
+    }
+
+    private void UseAgentsAndCopilot() =>
+        WriteContext("""{ "specVersion": "0.1.0", "project": { "name": "demo" }, "exports": { "targets": ["agents", "copilot"] } }""");
+
+    [Theory]
+    [InlineData("validate")]
+    [InlineData("status")]
+    [InlineData("export")]
+    public void Command_LockedReadme_ReportsTheFileAndFailsWithoutAnException(string command)
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+
+        CliResult result;
+        using (TestFiles.Lock(PathOf(Path.Combine(".aicontext", "README.md"))))
+        {
+            result = command == "export" ? Run(command, "--target", "all") : Run(command);
+        }
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("README.md could not be read", result.Error);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_OutputPathIsADirectory_FailsBeforeWritingAnyFileAndClaimsNoSuccess()
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+        Directory.CreateDirectory(PathOf(Path.Combine(".github", "copilot-instructions.md")));
+
+        var result = Run("export", "--target", "all");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("is a directory", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.Contains("Would create (agents)", result.Output);
+        Assert.DoesNotContain("Created (", result.Output);
+        Assert.DoesNotContain("Export completed", result.Output);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [Fact]
+    public void Export_Success_ReportsTheFilesOnlyAfterTheyWereWritten()
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+
+        var first = Run("export", "--target", "all");
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Contains("Created (agents)", first.Output);
+        Assert.Contains("Created (copilot)", first.Output);
+        Assert.DoesNotContain("Would", first.Output);
+        Assert.Contains("Export completed (2 changed, 0 unchanged).", first.Output);
+        Assert.True(File.Exists(PathOf("AGENTS.md")));
+
+        var second = Run("export", "--target", "all");
+
+        Assert.Equal(0, second.ExitCode);
+        Assert.Contains("Unchanged (agents)", second.Output);
+        Assert.Contains("Export completed (0 changed, 2 unchanged).", second.Output);
+    }
+
+    [Fact]
+    public void Export_DryRun_AnnouncesAPlanAndWritesNothing()
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+
+        var result = Run("export", "--target", "all", "--dry-run");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Would create (agents)", result.Output);
+        Assert.DoesNotContain("Created (", result.Output);
+        Assert.False(File.Exists(PathOf("AGENTS.md")));
+    }
+
+    [UnsupportedOSPlatform("windows")]
+    [LinkFact(LinkCapability.ReadOnlyDirectory)]
+    public void Export_SecondFileCannotBeWritten_ReportsWhatWasWrittenAndWhatWasNot()
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+        Assert.Equal(0, Run("export", "--target", "all").ExitCode);
+        File.AppendAllText(PathOf(Path.Combine(".aicontext", "README.md")), "\nA new line.\n");
+        var copilotBefore = File.ReadAllText(PathOf(Path.Combine(".github", "copilot-instructions.md")));
+
+        CliResult failed;
+        using (TestFiles.ReadOnlyDirectory(PathOf(".github")))
+        {
+            failed = Run("export", "--target", "all");
+        }
+
+        Assert.Equal(1, failed.ExitCode);
+        Assert.Contains("Updated (agents)", failed.Output);
+        Assert.Contains("Not written (copilot)", failed.Output);
+        Assert.DoesNotContain("Updated (copilot)", failed.Output);
+        Assert.DoesNotContain("Export completed", failed.Output);
+        Assert.Contains("could not be written", failed.Error);
+        Assert.Contains("Only 1 of 2 changed file(s) were written", failed.Error);
+        Assert.Contains("not a transaction", failed.Error);
+        Assert.Equal(copilotBefore, File.ReadAllText(PathOf(Path.Combine(".github", "copilot-instructions.md"))));
+
+        var retry = Run("export", "--target", "all");
+
+        Assert.Equal(0, retry.ExitCode);
+        Assert.Contains("Unchanged (agents)", retry.Output);
+        Assert.Contains("Updated (copilot)", retry.Output);
+        Assert.Contains("Export completed (1 changed, 1 unchanged).", retry.Output);
+    }
+
+    [Fact]
+    public void Init_OutputPathIsADirectory_FailsAndWritesNothing()
+    {
+        Directory.CreateDirectory(PathOf(Path.Combine(".aicontext", "README.md")));
+
+        var result = Run("init", "--name", "demo");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("is a directory", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.DoesNotContain("Created:", result.Output);
+        Assert.False(File.Exists(PathOf(Path.Combine(".aicontext", "context.json"))));
     }
 }
