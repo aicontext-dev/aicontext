@@ -61,14 +61,12 @@ public static class NestedAgentsPlanner
             kept);
     }
 
+    // A directory scope is `<dir>/**` or `<dir>/**/*`, the two spellings of "everything below <dir>" in SPEC 4.4.2.
+    // `<dir>` and `<dir>/` are not: a pattern without a wildcard names a file, and a trailing '/' is not a pattern.
     private static string? TryMapDirectory(string pattern, string basePath, out string? reason)
     {
         reason = null;
         var value = pattern.Trim();
-        if (value.StartsWith("./", StringComparison.Ordinal))
-        {
-            value = value[2..];
-        }
 
         string directory;
         if (value.EndsWith("/**/*", StringComparison.Ordinal))
@@ -79,13 +77,10 @@ public static class NestedAgentsPlanner
         {
             directory = value[..^3];
         }
-        else if (value.EndsWith('/'))
-        {
-            directory = value.TrimEnd('/');
-        }
         else
         {
-            directory = value;
+            reason = $"pattern '{SecretScanner.Redact(pattern)}' is not a directory scope (use '<directory>/**')";
+            return null;
         }
 
         var segments = directory.Split('/');

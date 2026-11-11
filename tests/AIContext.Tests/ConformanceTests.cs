@@ -262,4 +262,62 @@ public sealed class ConformanceTests : IDisposable
             Assert.Equal(valid, testCase.TryGetProperty("expect", out _));
         }
     }
+
+    public static IEnumerable<object[]> GlobCaseData() =>
+        ConformanceSuite.GlobCases().Select(c => new object[] { c.Pattern });
+
+    public static IEnumerable<object[]> GlobInvalidData() =>
+        ConformanceSuite.GlobInvalid().Select(c => new object[] { c.Pattern });
+
+    [Theory]
+    [MemberData(nameof(GlobCaseData))]
+    public void GlobCase_MatchesExactlyTheFilesTheManifestListsAndNoOther(string pattern)
+    {
+        var testCase = ConformanceSuite.GlobCases().Single(c => c.Pattern == pattern);
+
+        var actual = ConformanceSuite.GlobFiles().Where(file => PortableGlob.IsMatch(pattern, file));
+
+        Assert.Equal(testCase.Matches.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [MemberData(nameof(GlobInvalidData))]
+    public void GlobInvalid_IsRefusedByTheParserAndByARuleThatUsesIt(string pattern)
+    {
+        Assert.False(PortableGlob.Parse(pattern).IsValid);
+        Assert.False(PortableGlob.IsMatch(pattern, "src/app.ts"));
+
+        var rulesDirectory = Path.Combine(_project, ".aicontext", "rules");
+        Directory.CreateDirectory(rulesDirectory);
+        var quoted = pattern.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(rulesDirectory, "ui.md"), $"---\npaths: [\"{quoted}\"]\n---\nBody.\n");
+
+        var result = RuleLoader.Load(Path.Combine(_project, ".aicontext"));
+
+        Assert.Empty(result.Rules);
+        Assert.Contains(result.Diagnostics, d => d.IsError && d.Location == ".aicontext/rules/ui.md");
+    }
+
+    [Fact]
+    public void GlobManifest_EveryCaseNamesASpecSectionThatExistsAndTheMatchesAreFilesOfTheSet()
+    {
+        var headings = ReadSpecHeadings();
+        var files = ConformanceSuite.GlobFiles();
+
+        Assert.Equal(files.Count, files.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(files, file => Assert.DoesNotContain('\\', file));
+
+        var cases = ConformanceSuite.GlobCases();
+        Assert.Equal(cases.Count, cases.Select(c => c.Pattern).Distinct(StringComparer.Ordinal).Count());
+        foreach (var testCase in cases)
+        {
+            Assert.Contains(testCase.Spec, headings);
+            Assert.All(testCase.Matches, match => Assert.Contains(match, files));
+            Assert.Equal(testCase.Matches.Count, testCase.Matches.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        var invalid = ConformanceSuite.GlobInvalid();
+        Assert.Equal(invalid.Count, invalid.Select(c => c.Pattern).Distinct(StringComparer.Ordinal).Count());
+        Assert.All(invalid, c => Assert.Contains(c.Spec, headings));
+    }
 }

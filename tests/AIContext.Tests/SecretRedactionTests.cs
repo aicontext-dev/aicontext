@@ -45,6 +45,17 @@ public sealed class SecretRedactionTests : IDisposable
         ["frontmatter-key"] = p => Write(p, "rules/ui.md", $"---\ndescription: UI\n{Token}: x\n---\nBody.\n"),
         ["rule-path-separator"] = p => Write(p, "rules/ui.md", $"---\npaths: [src\\{Token}/**]\n---\nBody.\n"),
         ["rule-scope-pattern"] = p => Write(p, "rules/ui.md", $"---\npaths: [\"{Token}/**/*.cs\"]\n---\nBody.\n"),
+        ["rule-pattern-outside-subset"] = p => Write(p, "rules/ui.md", $"---\npaths: [\"{Token}/[x]/**\"]\n---\nBody.\n"),
+        ["rule-pattern-comma"] = p =>
+        {
+            Write(p, "context.json", ContextJson("""{ "targets": ["copilot", "windsurf"], "layout": "split" }"""));
+            Write(p, "rules/ui.md", $"---\npaths: [\"{Token},x/**\"]\n---\nBody.\n");
+        },
+        ["rule-pattern-root-level"] = p =>
+        {
+            Write(p, "context.json", ContextJson("""{ "targets": ["windsurf"], "layout": "split" }"""));
+            Write(p, "rules/ui.md", $"---\npaths: [\"{Token}\"]\n---\nBody.\n");
+        },
         ["rule-description"] = p => Write(p, "rules/ui.md", $"---\ndescription: Use {Token}\n---\nBody.\n"),
         ["project-name"] = p => Write(p, "context.json", $$"""{ "specVersion": "0.1.0", "project": { "name": "{{Token}}" }, "exports": { "targets": ["agents"] } }""")
     };

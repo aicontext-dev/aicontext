@@ -6,7 +6,7 @@ namespace AIContext;
 // Blocked: the file must not or cannot be written or removed, so the export is refused before anything is written.
 // Reason says why and ReasonCode is the matching diagnostic code: the path resolves outside the project, or into a
 // separate project, through a symlink or junction (D11, D12); a directory is where the file has to go; the existing
-// file cannot be read.
+// file cannot be read; or a scoped rule cannot be written for the tool without a different scope (D21).
 public enum ExportFileStatus
 {
     Created,
@@ -75,7 +75,9 @@ public static class ExportWriter
         {
             var path = ExportTarget.ResolveRelative(basePath, output.RelativePath);
             produced.Add(System.IO.Path.GetFullPath(path));
-            plans.Add(PlanFile(guard, target.Name, path, output.Content, force));
+            plans.Add(output.Problem is null
+                ? PlanFile(guard, target.Name, path, output.Content, force)
+                : new ExportFilePlan(target.Name, path, string.Empty, ExportFileStatus.Blocked, output.Problem, ReasonCode: DiagnosticCodes.ScopeNotRepresentable));
         }
 
         plans.AddRange(PlanOrphans(guard, target, basePath, produced));
@@ -330,6 +332,10 @@ public static class ExportWriter
             DiagnosticCodes.FileAccessFailed => Diagnostic.Error(
                 code,
                 $"{path} {reason}. Check that no other program has it locked and that you have permission, then run the command again.",
+                location),
+            DiagnosticCodes.ScopeNotRepresentable => Diagnostic.Error(
+                code,
+                $"{path} cannot be generated: {reason}. Nothing is written, because a scoped rule is never widened to the whole project. Rewrite the pattern, or export without this target (--target).",
                 location),
             _ => Diagnostic.Error(
                 DiagnosticCodes.PathOutsideProject,

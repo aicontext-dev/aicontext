@@ -49,6 +49,7 @@ public static class DiagnosticCodes
     public const string InvalidRulePathSeparator = "AIC2005";
     public const string UnreadableRuleFile = "AIC2006";
     public const string EmptyFrontmatterValue = "AIC2007";
+    public const string InvalidRulePathPattern = "AIC2008";
     public const string IgnoredRuleDirectory = "AIC2101";
     public const string IgnoredRuleFile = "AIC2102";
     public const string UnknownFrontmatterKey = "AIC2103";
@@ -68,6 +69,7 @@ public static class DiagnosticCodes
     public const string PathInSeparateProject = "AIC4104";
     public const string DestinationNotAFile = "AIC4105";
     public const string FileAccessFailed = "AIC4106";
+    public const string ScopeNotRepresentable = "AIC4107";
     public const string OrphanedTargetExport = "AIC4201";
 }
 

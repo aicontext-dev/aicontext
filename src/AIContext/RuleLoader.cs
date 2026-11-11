@@ -213,6 +213,14 @@ public static class RuleLoader
                             location));
                         valid = false;
                     }
+                    else if (PortableGlob.Parse(entry).Problem is { } patternProblem)
+                    {
+                        diagnostics.Add(Diagnostic.Error(
+                            DiagnosticCodes.InvalidRulePathPattern,
+                            $"{label}: path '{SecretScanner.Redact(entry)}' is not a pattern the specification defines (SPEC 4.4.2): {patternProblem}.",
+                            location));
+                        valid = false;
+                    }
 
                     paths.Add(entry);
                 }

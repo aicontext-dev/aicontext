@@ -202,6 +202,67 @@ public sealed class RuleLoaderTests : IDisposable
         Assert.Equal(expectedCode, Assert.Single(result.Diagnostics, d => d.IsError).Code);
     }
 
+    [Theory]
+    [InlineData("[\"src/[ab]/**\"]")]
+    [InlineData("[\"src/?.ts\"]")]
+    [InlineData("[\"!src/**\"]")]
+    [InlineData("[\"src/(group)/**\"]")]
+    [InlineData("/src/**")]
+    [InlineData("[\"./src/**\"]")]
+    [InlineData("src/ui/")]
+    [InlineData("\"**\"")]
+    [InlineData("[\"src/{a}/**\"]")]
+    [InlineData("[\"src/{a,{b,c}}/**\"]")]
+    public void Load_PatternOutsideThePortableSubset_IsAnErrorAndTheRuleIsNotLoaded(string paths)
+    {
+        WriteRule("ui.md", $"---\npaths: {paths}\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        var error = Assert.Single(result.Diagnostics, d => d.IsError);
+        Assert.Equal(DiagnosticCodes.InvalidRulePathPattern, error.Code);
+        Assert.Equal(".aicontext/rules/ui.md", error.Location);
+        Assert.Contains("SPEC 4.4.2", error.Message);
+    }
+
+    [Fact]
+    public void Load_OneBadPatternNextToGoodOnes_ReportsOnlyTheBadOneAndTheRuleIsNotLoaded()
+    {
+        WriteRule("ui.md", "---\npaths: [\"src/**\", \"src/[ab]/**\", \"lib/**\"]\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Rules);
+        var error = Assert.Single(result.Diagnostics, d => d.IsError);
+        Assert.Contains("'src/[ab]/**'", error.Message);
+    }
+
+    [Theory]
+    [InlineData("[\"src/a,b/**\"]", new[] { "src/a,b/**" })]
+    [InlineData("[Makefile, \"*.config.js\"]", new[] { "Makefile", "*.config.js" })]
+    [InlineData("src/**/*.{ts,tsx}", new[] { "src/**/*.{ts,tsx}" })]
+    [InlineData("[\"{src,lib}/**\"]", new[] { "{src,lib}/**" })]
+    public void Load_PatternInsideThePortableSubset_IsKeptAsWritten(string paths, string[] expected)
+    {
+        WriteRule("ui.md", $"---\npaths: {paths}\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(expected, Assert.Single(result.Rules).Paths);
+    }
+
+    [Fact]
+    public void Load_BackslashInAPattern_StaysAnAIC2005ErrorOnly()
+    {
+        WriteRule("ui.md", "---\npaths: [\"src\\\\ui\\\\**\"]\n---\nBody");
+
+        var result = RuleLoader.Load(_contextDirectory);
+
+        Assert.Equal(DiagnosticCodes.InvalidRulePathSeparator, Assert.Single(result.Diagnostics, d => d.IsError).Code);
+    }
+
     [Fact]
     public void Load_ValueOfAnUnknownKeyIsNotInterpreted()
     {

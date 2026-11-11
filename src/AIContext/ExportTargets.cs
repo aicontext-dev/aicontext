@@ -12,7 +12,9 @@ public enum RuleStyle
     Windsurf
 }
 
-public sealed record ExportOutput(string RelativePath, string Content);
+// Problem is set instead of Content when the file cannot be generated without giving a rule a different scope than
+// its author wrote (a pattern the tool cannot be told, see ScopeTranslator); the planner then blocks the export.
+public sealed record ExportOutput(string RelativePath, string Content, string? Problem = null);
 
 // Extra, optional rendering inputs. BasePath is needed to check which directories exist.
 public sealed record RenderOptions(string? BasePath, bool NestedAgents);
