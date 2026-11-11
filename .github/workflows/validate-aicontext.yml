@@ -35,6 +35,9 @@ on:
       - '.github/workflows/validate-aicontext.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
