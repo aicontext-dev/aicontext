@@ -1,15 +1,15 @@
 name: Release Binaries
 
-# Attaches standalone (self-contained, single-file) CLI binaries to a GitHub Release.
-# Create the release (tag vX.Y.Z) first; this workflow then uploads the assets.
+# Builds the standalone (self-contained, single-file) CLI binaries of the commit the calling workflow runs on, smoke-tests
+# the exact files and keeps them as artifacts. It publishes nothing: publish.yml attaches the artifacts to the GitHub
+# release after every check has passed. See RELEASING.md.
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      tag:
-        description: "Existing release tag to attach binaries to (for example v0.3.0)"
+      version:
+        description: "The version the binaries must report (without the leading v)"
         required: true
+        type: string
 
 permissions:
   contents: read
@@ -33,7 +33,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.event.release.tag_name }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -65,38 +66,6 @@ jobs:
           fi
           cp LICENSE stage/LICENSE
 
-      - name: Smoke test
-        run: |
-          bin="$PWD/stage/aicontext"
-          if [ "${{ matrix.rid }}" = "win-x64" ]; then bin="$bin.exe"; fi
-          work="$(mktemp -d)"
-          "$bin" --help
-          "$bin" --version
-          "$bin" init --path "$work" --name smoke-test
-          "$bin" validate --path "$work"
-          "$bin" export --path "$work" --target all
-          "$bin" export --path "$work" --target all --check
-          "$bin" validate --strict
-
-          # A fresh extended project is structurally complete, so plain validation passes, but strict
-          # validation reports its TODO placeholders until they are replaced.
-          ext="$(mktemp -d)"
-          "$bin" init --path "$ext" --name smoke-ext --profile extended
-          "$bin" validate --path "$ext"
-          if "$bin" validate --path "$ext" --strict; then
-            echo "strict validation accepted the TODO placeholders of a fresh extended project"
-            exit 1
-          fi
-
-          # Schema validation must still reject invalid input in the trimmed binary.
-          bad="$(mktemp -d)"
-          "$bin" init --path "$bad" --name smoke-bad
-          echo '{"specVersion":"0.1.0","project":{}}' > "$bad/.aicontext/context.json"
-          if "$bin" validate --path "$bad"; then
-            echo "validate accepted an invalid context.json"
-            exit 1
-          fi
-
       - name: Create archive
         run: |
           mkdir -p dist
@@ -107,30 +76,24 @@ jobs:
             tar -czf "dist/$name.tar.gz" -C stage .
           fi
 
+      # The archive is what is distributed, so it is the archive that is unpacked and smoke-tested.
+      - name: Smoke test the archive
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p verify
+          name="aicontext-${{ matrix.rid }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            powershell -NoProfile -Command "Expand-Archive -Path dist/$name.zip -DestinationPath verify"
+            bin="$PWD/verify/aicontext.exe"
+          else
+            tar -xzf "dist/$name.tar.gz" -C verify
+            bin="$PWD/verify/aicontext"
+          fi
+          bash .github/scripts/smoke-cli.sh "$bin" "$VERSION"
+
       - uses: actions/upload-artifact@v7
         with:
           name: aicontext-${{ matrix.rid }}
           path: dist/*
           if-no-files-found: error
-
-  upload:
-    name: Attach to release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: Create checksums
-        working-directory: dist
-        run: sha256sum aicontext-* > SHA256SUMS.txt
-
-      - name: Upload assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag || github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/* --clobber --repo "${{ github.repository }}"

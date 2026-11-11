@@ -1,17 +1,106 @@
 name: Publish NuGet Packages
 
+# Releases the commit this run started on: the NuGet packages and the standalone CLI binaries, which are attached to the
+# GitHub release of the tag. Start it from the release tag (Use workflow from: Tag vX.Y.Z) with "publish" ticked.
+# Without "publish", and on pull requests that change release files, it is a dry run: everything is built and tested,
+# nothing is published and no token is requested. See RELEASING.md.
+#
+# The file name matters: the Trusted Publishing policy on nuget.org names this workflow file.
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish for real (attach the binaries to the GitHub release, push to NuGet). Unticked is a dry run."
+        type: boolean
+        default: false
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/publish.yml"
+      - ".github/workflows/release-binaries.yml"
+      - ".github/workflows/pr-checks.yml"
+      - ".github/scripts/**"
+      - "src/**/*.csproj"
+      - "src/**/README.md"
+      - "LICENSE"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  publish:
+  # The commit is github.sha for the whole run. Every job below checks out that SHA, never a branch or tag name.
+  resolve:
+    name: Resolve the release input
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      publish: ${{ steps.mode.outputs.publish }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Decide between publish and dry run
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          PUBLISH_INPUT: ${{ inputs.publish }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] && [ "$PUBLISH_INPUT" = true ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the tag, the commit and the versions
+        id: check
+        env:
+          RELEASE_MODE: ${{ steps.mode.outputs.publish == 'true' && 'publish' || 'dry-run' }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bash .github/scripts/release-check.sh inputs "$RUNNER_TEMP/release-packages.txt"
+
+      # Everything that is already known to stop a release stops it here, before any build.
+      - name: Check NuGet and the GitHub release
+        env:
+          RELEASE_MODE: ${{ steps.mode.outputs.publish == 'true' && 'publish' || 'dry-run' }}
+          TAG: ${{ steps.check.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .github/scripts/nuget-plan.sh "$RUNNER_TEMP/release-packages.txt" "$RUNNER_TEMP/nuget-plan.txt"
+          if [ -n "$TAG" ]; then
+            bash .github/scripts/release-assets.sh check "$TAG"
+          fi
+
+  # The checks of a pull request (strict validation, export check, build, tests on both target frameworks, Linux and
+  # Windows), defined once in pr-checks.yml.
+  verify:
+    name: Verify
+    needs: resolve
+    permissions:
+      contents: read
+    uses: ./.github/workflows/pr-checks.yml
+
+  # Packed once. These exact files are smoke-tested, handed to the publish job as an artifact and pushed.
+  package:
+    name: Pack and smoke-test the NuGet packages
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -19,20 +108,109 @@ jobs:
             9.0.x
             10.0.x
 
+      - name: Pack
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: bash .github/scripts/pack.sh nupkgs
+
+      - name: Smoke-test the packed packages
+        run: bash .github/scripts/smoke-packages.sh nupkgs
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nupkgs
+          path: nupkgs/*
+          if-no-files-found: error
+
+  binaries:
+    name: Standalone binaries
+    needs: resolve
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      version: ${{ needs.resolve.outputs.version }}
+
+  # The reversible part first: an asset can be deleted, a NuGet version cannot.
+  upload-assets:
+    name: Attach the binaries to the GitHub release
+    needs: [resolve, verify, package, binaries]
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: aicontext-*
+          path: dist
+          merge-multiple: true
+
+      - name: Check that the tag still points at this commit
+        env:
+          RELEASE_MODE: publish
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bash .github/scripts/release-check.sh tag
+
+      - name: Upload (never replaces an existing asset)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: bash .github/scripts/release-assets.sh upload "$TAG" dist
+
+  publish-nuget:
+    name: Push to NuGet
+    needs: [resolve, upload-assets]
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: nupkgs
+          path: nupkgs
+
+      - name: Check that the tag still points at this commit
+        env:
+          RELEASE_MODE: publish
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bash .github/scripts/release-check.sh tag
+
+      - name: Plan the push again
+        env:
+          RELEASE_MODE: publish
+        run: bash .github/scripts/nuget-plan.sh nupkgs/release-packages.txt "$RUNNER_TEMP/nuget-plan.txt"
+
+      # The token comes last, right before the push (it is valid for one hour and is issued once).
       - name: NuGet login (Trusted Publishing)
         uses: NuGet/login@v1
         id: nuget-login
         with:
           user: aicontext-dev
 
-      - name: Pack all projects
-        run: |
-          dotnet pack src/AIContext/AIContext.csproj -c Release -o ./nupkgs
-          dotnet pack src/AIContext.CLI/AIContext.CLI.csproj -c Release -o ./nupkgs
-          dotnet pack src/AIContext.Spec/AIContext.Spec.csproj -c Release -o ./nupkgs
-
       - name: Push to NuGet
-        run: |
-          for f in ./nupkgs/*.nupkg; do
-            dotnet nuget push "$f" --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --skip-duplicate
-          done
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: bash .github/scripts/nuget-push.sh nupkgs "$RUNNER_TEMP/nuget-plan.txt"
