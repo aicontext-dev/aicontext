@@ -2,7 +2,7 @@
 
 Status: DRAFT  
 Version: 0.1.0-draft  
-Last updated: 2026-11-09
+Last updated: 2026-11-12
 
 ---
 
@@ -352,7 +352,7 @@ While the specification is a draft (`0.x`), additions may be made within the cur
 | 0.4.0 | 0.1.0-draft | None; `exports.defaultTarget` semantics clarified (6.1) |
 | 0.5.0 | 0.1.0-draft | None; requirements clarified: no writes outside the project and separate projects (6.3, 6.4), export applies validation errors (7), the secret lint is a heuristic (10) |
 | 0.6.0 | 0.1.0-draft | None; requirements clarified: the properties of `context.json` and the rules beyond the schema (5.1, 5.2; the schema now also states that `project.name` has a non-whitespace character), a plan is verified again before writing (6.3), separate projects also behind links (6.4). No document that was valid before is rejected |
-| Unreleased | 0.1.0-draft | Rule files only (4.4, 4.4.1, 4.4.2); `context.json` and its schema do not change. The frontmatter is a strict subset with one reading (4.4.1), and the items of `paths` have one meaning in every tool (4.4.2), with a refused export instead of a changed scope (6.4). Rule files that were accepted before can be invalid now (an empty `paths` or `description`, a repeated key, a bad quote, a pattern outside 4.4.2), and a pattern without `/` means the root only for Claude too. The generated Copilot file of a scoped rule no longer has a `description` field (6.4). A lone CR is a line break like LF and CRLF (6.2), so a rule file with CR endings is read as written instead of losing its header. See the CHANGELOG for the migration |
+| 0.7.0 | 0.1.0-draft | `context.json` and its schema do not change. Requirement clarified: a source outside the project root SHOULD NOT be read (10). Rule files (4.4, 4.4.1, 4.4.2): the frontmatter is a strict subset with one reading (4.4.1), and the items of `paths` have one meaning in every tool (4.4.2), with a refused export instead of a changed scope (6.4). Rule files that were accepted before can be invalid now (an empty `paths` or `description`, a repeated key, a bad quote, a pattern outside 4.4.2), and a pattern without `/` means the root only for Claude too. The generated Copilot file of a scoped rule no longer has a `description` field (6.4). A lone CR is a line break like LF and CRLF (6.2), so a rule file with CR endings is read as written instead of losing its header. See the CHANGELOG for the migration |
 
 ## 10. Security and privacy guidance
 

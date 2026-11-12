@@ -95,7 +95,8 @@ public static class ExportWriter
     // Writes one planned file; ExportService.Apply verifies the whole plan before it calls this.
     // - Created: the file is created exclusively, so a file that appeared after planning is never overwritten, and
     //   one that is only partly written is removed again.
-    // - Updated: the file is replaced through a temporary file, so a failure leaves the old content intact.
+    // - Updated: a regular file is replaced through a temporary file, so a failure leaves the old content intact. A file
+    //   that is a link is overwritten in place (see ReplaceExisting), which has no such protection.
     // - Deleted: the file is removed.
     // An expected I/O failure (locked, no permission, no space) is thrown as IOException or
     // UnauthorizedAccessException; ExportService.Apply reports it as a diagnostic with the files already written.
@@ -158,11 +159,13 @@ public static class ExportWriter
         }
     }
 
-    // Replaces an existing file so that a failure never leaves it half-written: the new content is written to a
-    // temporary file in the same directory and swapped in, and the temporary file is removed if anything fails. The
-    // swap must not change what the destination means, so before it:
+    // Replaces an existing regular file so that a failure never leaves it half-written: the new content is written to a
+    // temporary file in the same directory and swapped in, and the temporary file is removed if anything fails. A file
+    // that is a link is the exception (first item below): it has no such protection. The swap must not change what the
+    // destination means, so before it:
     // - a link is not replaced (that would put a regular file where the link was and change where the content
-    //   lands); it is overwritten in place, as before, and an interrupted write can leave it incomplete;
+    //   lands); it is overwritten in place, as before, so an interrupted write can leave the file it points to
+    //   incomplete, and the final stale-plan check below does not apply to it (Apply verified the plan before writing);
     // - the file must be writable as it is (permission, not locked): a read-only file in a writable directory is not
     //   replaced, and nothing is truncated to find out;
     // - the permission bits of the old file are kept on Unix (the owner, ACLs and extended attributes of the old file
