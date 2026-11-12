@@ -6,7 +6,8 @@ namespace AIContext;
 // Blocked: the file must not or cannot be written or removed, so the export is refused before anything is written.
 // Reason says why and ReasonCode is the matching diagnostic code: the path resolves outside the project, or into a
 // separate project, through a symlink or junction (D11, D12); a directory is where the file has to go; the existing
-// file cannot be read; or a scoped rule cannot be written for the tool without a different scope (D21).
+// file cannot be read, or has to change and cannot be written (locked, read-only, no permission); or a scoped rule
+// cannot be written for the tool without a different scope (D21).
 public enum ExportFileStatus
 {
     Created,
@@ -308,9 +309,13 @@ public static class ExportWriter
         }
 
         return plan.Status == ExportFileStatus.Updated && FindWriteBlock(plan.Path) is { } cannotWrite
-            ? BlockedDiagnostic(plan.Path, $"cannot be written ({cannotWrite})", DiagnosticCodes.FileAccessFailed, location)
+            ? BlockedDiagnostic(plan.Path, CannotWrite(cannotWrite), DiagnosticCodes.FileAccessFailed, location)
             : null;
     }
+
+    // The reason of a Blocked file that exists but cannot be written, worded the same when the plan finds it and when
+    // Apply finds it again.
+    private static string CannotWrite(string failure) => $"cannot be written ({failure})";
 
     // refusal starts the sentence that says what is never done; init words it for itself.
     internal static Diagnostic BlockedDiagnostic(
@@ -400,6 +405,14 @@ public static class ExportWriter
             }
 
             var status = force || IsGenerated(existing) ? ExportFileStatus.Updated : ExportFileStatus.Conflict;
+
+            // The same check Apply makes before it writes, so the plan, a preview and the real run agree. Only a file
+            // that has to change is probed: nothing is written to an up-to-date one, so it may well be read-only.
+            if (status == ExportFileStatus.Updated && FindWriteBlock(path) is { } cannotWrite)
+            {
+                return new ExportFilePlan(targetName, path, string.Empty, ExportFileStatus.Blocked, CannotWrite(cannotWrite), ReasonCode: DiagnosticCodes.FileAccessFailed);
+            }
+
             return new ExportFilePlan(targetName, path, content, status, ExistingHash: HashOf(bytes));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

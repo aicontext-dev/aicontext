@@ -652,6 +652,55 @@ public sealed class CliAppTests : IDisposable
         Assert.False(File.Exists(PathOf("AGENTS.md")));
     }
 
+    // The preview must say what the real export will find: an output that has to change but is read-only (a file the
+    // tool never has to write is not a problem). Every mode fails with exit code 1, names the file, and writes nothing.
+    [LinkTheory(LinkCapability.ReadOnlyFile)]
+    [InlineData("--dry-run")]
+    [InlineData("--check")]
+    [InlineData("")]
+    public void Export_OutOfDateOutputIsReadOnly_EveryModeFailsAndNamesTheFile(string mode)
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+        Assert.Equal(0, Run("export", "--target", "all").ExitCode);
+        File.AppendAllText(PathOf(Path.Combine(".aicontext", "README.md")), "\nA new line.\n");
+        var agentsBefore = File.ReadAllText(PathOf("AGENTS.md"));
+        var copilotPath = PathOf(Path.Combine(".github", "copilot-instructions.md"));
+        var copilotBefore = File.ReadAllText(copilotPath);
+
+        CliResult result;
+        using (TestFiles.ReadOnlyFile(copilotPath))
+        {
+            result = mode.Length == 0 ? Run("export", "--target", "all") : Run("export", "--target", "all", mode);
+        }
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("ERROR: ", result.Error);
+        Assert.Contains("copilot-instructions.md cannot be written", result.Error);
+        Assert.Contains("No files were written", result.Error);
+        Assert.Contains("Blocked (copilot)", result.Output);
+        Assert.DoesNotContain("Export is out of date", result.Error);
+        Assert.DoesNotContain("Export completed", result.Output);
+        Assert.DoesNotContain("Dry run:", result.Output);
+        Assert.Equal(agentsBefore, File.ReadAllText(PathOf("AGENTS.md")));
+        Assert.Equal(copilotBefore, File.ReadAllText(copilotPath));
+    }
+
+    [LinkFact(LinkCapability.ReadOnlyFile)]
+    public void Export_ReadOnlyOutputIsUpToDate_PreviewAndCheckPass()
+    {
+        InitProject();
+        UseAgentsAndCopilot();
+        Assert.Equal(0, Run("export", "--target", "all").ExitCode);
+
+        using (TestFiles.ReadOnlyFile(PathOf(Path.Combine(".github", "copilot-instructions.md"))))
+        {
+            Assert.Equal(0, Run("export", "--target", "all", "--dry-run").ExitCode);
+            Assert.Equal(0, Run("export", "--target", "all", "--check").ExitCode);
+            Assert.Equal(0, Run("export", "--target", "all").ExitCode);
+        }
+    }
+
     [Fact]
     public void Export_OutputPathIsADirectory_FailsBeforeWritingAnyFileAndClaimsNoSuccess()
     {
