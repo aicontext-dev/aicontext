@@ -32,7 +32,7 @@ public static class Frontmatter
 {
     public static FrontmatterResult Parse(string text)
     {
-        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalized = LineEndings.Normalize(text);
         var values = new Dictionary<string, FrontmatterValue>(StringComparer.Ordinal);
 
         if (!normalized.StartsWith("---\n", StringComparison.Ordinal))

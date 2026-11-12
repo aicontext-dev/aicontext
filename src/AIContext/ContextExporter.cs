@@ -110,12 +110,13 @@ public static class ContextExporter
         return builder.ToString().TrimEnd() + "\n";
     }
 
-    // Hash of the normalized sources, so output is identical across OSes and line-ending settings.
+    // Hash of the normalized sources, so output is identical across OSes and line-ending settings. The normalization
+    // is LineEndings.Normalize (LF, CRLF and a lone CR are one break); text with LF endings hashes as it always did.
     public static string ComputeSourceHash(ExportContext exportContext)
     {
         var parts = new List<string>
         {
-            exportContext.ProjectName,
+            ProjectName(exportContext),
             NormalizeReadmeForAgents(exportContext.ReadmeContent),
             Clean(exportContext.Architecture),
             Clean(exportContext.Decisions),
@@ -127,7 +128,7 @@ public static class ContextExporter
         foreach (var rule in exportContext.Rules ?? [])
         {
             parts.Add($"rule:{rule.Name}");
-            parts.Add(rule.Description ?? string.Empty);
+            parts.Add(LineEndings.Normalize(rule.Description ?? string.Empty));
             parts.Add(string.Join('\n', rule.Paths));
             parts.Add(Clean(rule.Body));
         }
@@ -144,7 +145,7 @@ public static class ContextExporter
 
     private static IReadOnlyList<Item> BuildItems(ExportContext exportContext)
     {
-        var name = exportContext.ProjectName;
+        var name = ProjectName(exportContext);
         var items = new List<Item>();
 
         AddBuiltIn(items, "architecture", "Architecture", exportContext.Architecture,
@@ -159,7 +160,8 @@ public static class ContextExporter
 
         foreach (var rule in (exportContext.Rules ?? []).OrderBy(r => r.Name, StringComparer.Ordinal))
         {
-            items.Add(new Item(rule.Name, $"Rule: {rule.Name}", Clean(rule.Body), rule.Description, rule.Paths, rule.Kind, true));
+            var description = rule.Description is null ? null : LineEndings.Normalize(rule.Description);
+            items.Add(new Item(rule.Name, $"Rule: {rule.Name}", Clean(rule.Body), description, rule.Paths, rule.Kind, true));
         }
 
         return items;
@@ -186,8 +188,8 @@ public static class ContextExporter
         if (target.Style == RuleStyle.Cursor)
         {
             var cursorDescription = split
-                ? $"Core project context and constraints for {exportContext.ProjectName}"
-                : $"Project constraints and patterns for {exportContext.ProjectName}";
+                ? $"Core project context and constraints for {ProjectName(exportContext)}"
+                : $"Project constraints and patterns for {ProjectName(exportContext)}";
 
             AppendLine(builder, "---");
             AppendLine(builder, $"description: {Quote(cursorDescription)}");
@@ -205,7 +207,7 @@ public static class ContextExporter
 
         AppendHeader(builder, target.Name, hash);
 
-        var title = MainTitle(target.Name, exportContext.ProjectName);
+        var title = MainTitle(target.Name, ProjectName(exportContext));
         if (title is not null)
         {
             AppendLine(builder, $"# {title}");
@@ -292,7 +294,7 @@ public static class ContextExporter
         AppendLine(builder, string.Empty);
         if (target.Style == RuleStyle.Copilot && description is not null)
         {
-            AppendLine(builder, $"Description: {NormalizeLineEndings(description).Trim()}");
+            AppendLine(builder, $"Description: {description.Trim()}");
             AppendLine(builder, string.Empty);
         }
 
@@ -336,7 +338,7 @@ public static class ContextExporter
 
     private static string NormalizeReadmeForAgents(string readmeContent)
     {
-        var lines = NormalizeLineEndings(readmeContent)
+        var lines = LineEndings.Normalize(readmeContent)
             .Split('\n')
             .ToList();
 
@@ -353,10 +355,11 @@ public static class ContextExporter
     }
 
     private static string Clean(string? content) =>
-        content is null ? string.Empty : NormalizeLineEndings(content).Trim();
+        content is null ? string.Empty : LineEndings.Normalize(content).Trim();
 
-    internal static string NormalizeLineEndings(string value) =>
-        value.Replace("\r\n", "\n", StringComparison.Ordinal);
+    // The name of the project in titles and descriptions: a name from context.json that holds a line break would
+    // otherwise be the one place where a CR gets into the output.
+    private static string ProjectName(ExportContext exportContext) => LineEndings.Normalize(exportContext.ProjectName);
 
     // Always LF, so output does not depend on Environment.NewLine.
     private static void AppendLine(StringBuilder builder, string line) =>

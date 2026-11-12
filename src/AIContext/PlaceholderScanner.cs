@@ -77,7 +77,7 @@ public static class PlaceholderScanner
     public static IReadOnlyList<PlaceholderFinding> Scan(string fileName, string content)
     {
         var findings = new List<PlaceholderFinding>();
-        var lines = content.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        var lines = LineEndings.Normalize(content).Split('\n');
         var inFence = false;
 
         for (var i = 0; i < lines.Length; i++)
