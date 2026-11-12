@@ -74,7 +74,8 @@ CLAUDE.md          &lt;- generated
 aicontext validate                     # schema, recommended files, placeholders, possible secrets
 aicontext export --target all          # writes AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, ...
 aicontext export --target all --check  # in CI: exit code 1 when the generated files are out of date</code></pre>
-<pre><code>Created (agents): AGENTS.md
+<pre><code># the tool prints the full path of each file; shortened here
+Created (agents): AGENTS.md
 Created (copilot): .github\copilot-instructions.md
 Created (claude): CLAUDE.md
 Created (cursor): .cursor\rules\project.mdc

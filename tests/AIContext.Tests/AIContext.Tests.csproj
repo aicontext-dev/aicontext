@@ -18,5 +18,11 @@
     <Content Include="..\..\conformance\**\*.json" Link="conformance\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\conformance\v0.1\rules\**\*.md" Link="conformance\v0.1\rules\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\SPEC.md" Link="spec\SPEC.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="LibraryReadmeSample.cs" Link="docs\sample\LibraryReadmeSample.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\README.md" Link="docs\README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\AIContext\README.md" Link="docs\library\README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\AIContext.CLI\README.md" Link="docs\cli\README.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\user-manual.md" Link="docs\user-manual.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\index.html" Link="docs\index.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

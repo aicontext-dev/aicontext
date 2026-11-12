@@ -42,6 +42,7 @@ aicontext export --target all --check  # in CI: exit code 1 when the generated f
 ```
 
 ```text
+# the tool prints the full path of each file; shortened here
 Created (agents): AGENTS.md
 Created (copilot): .github\copilot-instructions.md
 Created (claude): CLAUDE.md
@@ -129,10 +130,10 @@ aicontext validate
 
 ## Validation
 
-Local validation command (from the repository, without installing the tool):
+Local validation command (from the repository root, without installing the tool). The CLI targets both `net9.0` and `net10.0`, so `dotnet run` needs the framework to run (`-f net9.0` works as well):
 
 ```powershell
-dotnet run --project .\src\AIContext.CLI -- validate --strict
+dotnet run --project src/AIContext.CLI -f net10.0 -- validate --strict
 ```
 
 CI workflows:
@@ -140,10 +141,10 @@ CI workflows:
 - [validate-aicontext.yml](./.github/workflows/validate-aicontext.yml)
 - [pr-checks.yml](./.github/workflows/pr-checks.yml)
 
-Test command:
+Test command (runs the tests on both frameworks):
 
 ```powershell
-dotnet test .\tests\AIContext.Tests\AIContext.Tests.csproj -c Release
+dotnet test tests/AIContext.Tests/AIContext.Tests.csproj -c Release
 ```
 
 ## CLI (MVP)
