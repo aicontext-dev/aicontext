@@ -13,11 +13,12 @@ A release is made by one workflow, [publish.yml](./.github/workflows/publish.yml
 
 ## How to make a release
 
-1. Set `<Version>` to the same value in `src/AIContext/AIContext.csproj` and `src/AIContext.CLI/AIContext.CLI.csproj`. Change `AIContext.Spec` only when you mean to publish a new version of it. Update [CHANGELOG.md](./CHANGELOG.md), and merge through a pull request.
-2. Create the tag `vX.Y.Z` on the merge commit and a **published** GitHub release for it. The workflow attaches the binaries to that release; it does not create it.
-3. Optional rehearsal: Actions, Publish NuGet Packages, Run workflow, choose the tag and leave **Publish** unticked. It runs everything below except the two publishing jobs.
-4. Actions, Publish NuGet Packages, Run workflow, **Use workflow from: Tag vX.Y.Z**, tick **Publish**.
-5. Check the release assets and the packages on nuget.org.
+1. Prepare the release on a branch named `release/X.Y.Z`. Do not name the branch `vX.Y.Z`: the tag has that name, a branch and a tag with the same name make `git push origin vX.Y.Z` and `git checkout vX.Y.Z` ambiguous, and the workflow picker then lists two refs with one name.
+2. On that branch: set `<Version>` to the same value in `src/AIContext/AIContext.csproj` and `src/AIContext.CLI/AIContext.CLI.csproj` (change `AIContext.Spec` only when you mean to publish a new version of it), close `[Unreleased]` in [CHANGELOG.md](./CHANGELOG.md) with the version and the date, add a short upgrade summary there, and update the row of the version in [SPEC.md](./SPEC.md) section 9.1 and the version in the README and in the first lines of the user manual. Merge through a pull request. A pull request that changes `src/**/*.csproj` also runs the workflow as a dry run; wait for it to be green.
+3. Create the tag `vX.Y.Z` on the merge commit and a **published** GitHub release for it (not a draft, and without assets). The workflow attaches the binaries to that release; it does not create it.
+4. Rehearsal (recommended, and the first thing to do for the first release made with this workflow): Actions, Publish NuGet Packages, Run workflow, **Use workflow from: Tag vX.Y.Z**, leave **Publish** unticked. Started from the tag it also runs the tag checks and the check of the release; in a dry run a problem that would stop a release is a warning ("Dry run. A release would stop here: ..."), so read the warnings of the first job. Expected: none.
+5. Actions, Publish NuGet Packages, Run workflow, **Use workflow from: Tag vX.Y.Z**, tick **Publish**.
+6. Check the release assets and the packages on nuget.org.
 
 Publishing the GitHub release does not start the workflow, and a workflow started from a branch cannot publish.
 
@@ -32,7 +33,17 @@ Publishing the GitHub release does not start the workflow, and a workflow starte
 
 The reversible part (release assets can be deleted) comes first; the irreversible one (a NuGet version cannot be replaced) comes last.
 
-Without **Publish**, and on pull requests that change release files, the workflow is a dry run: jobs 1 to 4 run, a problem that would stop a release is reported as a warning, nothing is published, and no token is requested.
+Without **Publish**, and on pull requests that change release files, the workflow is a dry run: jobs 1 to 4 run, a problem that would stop a release is reported as a warning, nothing is published, and no token is requested. A dry run shows that the packages and the binaries build and pass their tests; it does not show that publishing works (see the next section).
+
+## What has been run, and what has not
+
+State on 2026-11-12. Update this section after the first release made with this workflow.
+
+- **Dry runs (no Publish) on pull requests passed**: pull request #20 (2026-11-11) and pull request #25 (2026-11-12). In both, `resolve`, the four checks of `verify`, the pack and smoke test of the packages, and the standalone binaries on all five platforms succeeded, and `upload-assets` and `publish-nuget` were skipped, as designed. A pull request is not started from a tag, so the tag checks and the check of the release were not exercised.
+- **Not run yet**: a run started from a tag, and any run with **Publish** ticked. So the attachment of the binaries to a release (`upload-assets`, `release-assets.sh`), the Trusted Publishing login in its current job (`NuGet/login` in `publish-nuget`) and the push (`nuget-push.sh`) have not been run on GitHub. Versions 0.2.0 to 0.6.0 were published by an earlier shape of this workflow (a manual checkout, pack and push); the same Trusted Publishing policy worked for it, which is a reason to expect the login to work, not a proof for the current jobs.
+- The scripts in `.github/scripts/` were run locally on Linux and Windows against local stand-ins for nuget.org and GitHub.
+
+The first real release with this workflow therefore is also the first real run of its irreversible part. That is why the rehearsal from the tag (step 4 above) comes first, and why a failure in `upload-assets` is cheap (assets can be deleted) while one in `publish-nuget` is not (a NuGet version cannot be replaced).
 
 ## Nothing is replaced
 
@@ -53,4 +64,4 @@ This repository cannot verify these, and the workflow does not change them:
 
 - The binaries and the checksums are not signed. `SHA256SUMS.txt` and `SOURCE.txt` document where they come from; they are not proof of it. The NuGet packages are signed by nuget.org after the push, so their hash differs from the one of the file in the run.
 - External actions are referenced by major version, not by commit SHA.
-- The scripts in `.github/scripts/` were run locally on Linux and Windows against local stand-ins for nuget.org and GitHub. A run of the workflow on GitHub has not been done; the first dry run on a pull request is the first real test of the cloud part.
+- What has and has not been run on GitHub is in the previous section.

@@ -162,7 +162,8 @@ public static class ExportService
     // the errors.
     //
     // After that the files are written one by one, and each write is safe on its own (a new file is created
-    // exclusively, an existing one is replaced through a temporary file). The whole is not a transaction: if a write
+    // exclusively, an existing regular file is replaced through a temporary file; a file that is a link is overwritten
+    // in place, without that protection). The whole is not a transaction: if a write
     // fails (locked, no permission, no space), writing stops, the failure is a diagnostic, and the result lists what
     // was already written (Written); those files stay. Nothing is rolled back and the later files are untouched.
     // Planning again from the files on disk and applying finishes the job. An unexpected exception, which is a bug,

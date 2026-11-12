@@ -5,8 +5,9 @@ using Xunit;
 
 namespace AIContext.Tests;
 
-// How a single file is written: an existing file is replaced through a temporary file so that a failure never leaves
-// it half-written, and a new file is created exclusively and removed again if it could not be written completely.
+// How a single file is written: an existing regular file is replaced through a temporary file so that a failure never
+// leaves it half-written (a link is the exception: it is overwritten in place), and a new file is created exclusively
+// and removed again if it could not be written completely.
 // The failure after the temporary (or new) file exists is injected through the seam the writer offers for tests.
 public sealed class SafeWriteTests : IDisposable
 {
