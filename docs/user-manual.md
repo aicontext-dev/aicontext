@@ -115,6 +115,7 @@ Output:
 ```
 Created: C:\projects\my-project\.aicontext\README.md
 Created: C:\projects\my-project\.aicontext\context.json
+Next: replace the TODO placeholders in .aicontext/ with real content; 'aicontext validate' reports them until you do.
 ```
 
 Two files are created. If you omit `--name`, the directory name is used.
