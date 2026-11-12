@@ -93,9 +93,9 @@ public sealed class DocumentationExamplesTests : IDisposable
         Assert.Equal(before, FilesOnDisk());
     }
 
-    // The plan is fine; Apply finds that a file cannot be written and refuses before it writes anything.
+    // A read-only file that has to change is known when the plan is made, so the example stops at the plan.
     [LinkFact(LinkCapability.ReadOnlyFile)]
-    public void Sample_ApplyRefusesTheWholePlan_ReturnsTwoAndChangesNothing()
+    public void Sample_OutputThatCannotBeWritten_ReturnsOneAndChangesNothing()
     {
         Assert.Equal(0, LibraryReadmeSample.Run(_project));
         File.AppendAllText(InProject(".aicontext/README.md"), "\nA new line.\n");
@@ -109,12 +109,13 @@ public sealed class DocumentationExamplesTests : IDisposable
             exitCode = LibraryReadmeSample.Run(_project);
         }
 
-        Assert.Equal(2, exitCode);
+        Assert.Equal(1, exitCode);
         Assert.Equal(agentsBefore, File.ReadAllText(InProject("AGENTS.md")));
         Assert.Equal(copilotBefore, File.ReadAllText(InProject(".github/copilot-instructions.md")));
     }
 
-    // The first file is written and the second cannot be: the example reports the failure, and what was written stays.
+    // The first file is written and the second cannot be: Apply stops, the example reports it, and what was written
+    // stays. The plan cannot know a directory without write permission, so this is the Apply branch of the example.
     [UnsupportedOSPlatform("windows")]
     [LinkFact(LinkCapability.ReadOnlyDirectory)]
     public void Sample_WriteFailsMidway_ReturnsTwoAndKeepsTheFilesAlreadyWritten()
