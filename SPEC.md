@@ -2,7 +2,7 @@
 
 Status: DRAFT  
 Version: 0.1.0-draft  
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 ---
 
@@ -342,6 +342,8 @@ The specification and the reference tooling are versioned independently:
 
 - **Specification version** (`Version` in this file, `specVersion` in `context.json`, the schema under `schema/v1/`) identifies the format. It changes only when the format changes.
 - **Tool version** (the `AIContext` and `AIContext.CLI` packages and the standalone binaries) identifies a software release. It also changes for bug fixes and features that do not alter the format.
+
+The draft label describes the maturity of the compatibility commitment, not whether the tooling is usable. The `v1` segment in the existing schema URL is a publication path, not a declaration that the specification is `1.0.0`; the accepted `specVersion` is still `0.1.0`. The JSON Schema dialect (`draft/2020-12` in the schema's own `$schema`) is a separate version again. The readiness criteria in [GOVERNANCE 6.2](./GOVERNANCE.md#62-before-the-first-stable-release) describe work before stabilization, not changes to this draft's accepted input.
 
 While the specification is a draft (`0.x`), additions may be made within the current version and `specVersion` stays `0.1.0`. The first change that makes existing files invalid or changes their meaning bumps the specification version, and the schema is widened so that files declaring older supported versions remain valid. This concerns `context.json`, which declares the version. Rule files (4.4) carry no version of their own and are the part of the draft that is still being settled, so a change of what a rule file means is recorded in the table below and in the CHANGELOG, with migration examples, and does not bump `specVersion`.
 

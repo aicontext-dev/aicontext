@@ -6,6 +6,11 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ## [Unreleased]
 
+### Documentation
+
+- Shortened this repository's `.aicontext/decisions.md` to operational summaries of D1-D22 and preserved their full rationale and history in [Project decisions](./docs/decisions.md). Regenerated tool instructions carry the summaries instead of the full history. This changes this repository's context, not the export algorithm or the file format.
+- Documented the single-maintainer decision process and the evidence needed before declaring the specification stable. Clarified the distinction between the draft format, schema URL, JSON Schema dialect and tool versions. The schema, `specVersion` (`0.1.0`) and rule parsing behavior, including the treatment of `Paths`, are unchanged.
+
 ## [0.7.0] - 2026-11-12
 
 This release makes `export` and `init` safe against links and ordinary I/O failures, gives the rule files of `.aicontext/rules/` one exact grammar and one meaning of `paths`, refuses context sources that lead outside the project, and moves the release to one verified workflow. It is **not** a drop-in update for every project: some input that was accepted before is an error now, and a few scopes mean something else. Read **Upgrade notes** first. The format of `context.json` does not change: `specVersion` stays `0.1.0`, and no `context.json` that was valid before is rejected.

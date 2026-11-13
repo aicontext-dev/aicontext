@@ -108,6 +108,8 @@ Governance: [GOVERNANCE.md](./GOVERNANCE.md)
 Security policy: [SECURITY.md](./SECURITY.md)  
 Changelog: [CHANGELOG.md](./CHANGELOG.md)
 
+Project decisions and rationale: [docs/decisions.md](./docs/decisions.md)
+
 ## How to use schema
 
 Use the canonical schema URL in your `.aicontext/context.json`:
