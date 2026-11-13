@@ -37,11 +37,13 @@ jobs:
       - name: Build site artifact
         run: |
           mkdir -p _site/spec
+          mkdir -p _site/docs
           mkdir -p _site/schema/v1
           cp docs/index.html _site/index.html
           cp docs/CNAME _site/CNAME
           cp docs/spec/index.html _site/spec/index.html
           cp docs/user-manual.md _site/user-manual.md
+          cp docs/decisions.md _site/docs/decisions.md
           cp README.md _site/README.md
           cp SPEC.md _site/SPEC.md
           cp GOVERNANCE.md _site/GOVERNANCE.md

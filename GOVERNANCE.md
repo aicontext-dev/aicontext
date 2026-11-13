@@ -1,7 +1,7 @@
 # AIContext Governance
 
 Status: DRAFT  
-Last updated: 2026-11-08
+Last updated: 2026-11-13
 
 ## 1. Scope
 
@@ -30,9 +30,11 @@ Contributors can:
 AIContext uses maintainer consensus for normative changes.
 
 - Minor/editorial changes can be merged with one maintainer approval.
-- Normative changes (format behavior, required fields, compatibility rules) require:
+- With two or more maintainers, normative changes (format behavior, required fields, compatibility rules) require:
   - at least two maintainer approvals, and
   - no unresolved maintainer objections.
+
+During the single-maintainer phase, the sole maintainer may accept a normative change by recording the decision, rationale, alternatives and compatibility impact in a public issue or pull request. A second approval is not required in that phase; this does not waive the compatibility policy or the need for specification, implementation and conformance evidence to agree.
 
 If consensus cannot be reached, maintainers may timebox discussion and make a final recorded decision in the RFC thread.
 
@@ -49,6 +51,8 @@ Normative changes SHOULD follow this process:
    - related docs/changelog
 5. Merge after approval rules are met.
 6. Publish release notes and version updates.
+
+During the single-maintainer draft phase, the proposal, discussion and decision may live in the implementing pull request instead of a separate RFC issue. If the recommended discussion period is shortened, record why in that pull request. The change and its migration impact must still be reviewable.
 
 ## 5. Versioning policy
 
@@ -72,13 +76,22 @@ Until the specification leaves draft status (its first stable release), the comm
 
 ### 6.2 Before the first stable release
 
+Draft describes the maturity of the compatibility commitment, not whether the tooling is usable. A draft can be released and tried in real projects. Declaring the specification stable is a separate decision from releasing a new CLI version or presenting the project publicly.
+
 Before the specification is declared stable the maintainers plan to decide and document:
 
-- which published schema versions become immutable, and under which URLs,
-- how an implementation reacts to a document that declares a newer `specVersion` or uses properties it does not know (reject, or accept with a warning),
-- the [conformance suite](./conformance/README.md) that independent implementations can run, extended with the cases that define these compatibility rules.
+- how a project version identifies the whole input contract, including rule frontmatter and path patterns, rather than only `context.json`;
+- which published specification, schema and fixture snapshots become immutable, and under which URLs, keeping existing published URLs available;
+- which versions each implementation supports, how it handles newer versions and unknown properties, and how projects migrate;
+- how to distinguish an input-format change from a correction to a tool-specific exporter;
+- the [conformance suite](./conformance/README.md) covering that contract, compatibility cases and export semantics, with reference-output fixtures where appropriate;
+- evidence from independent review or a scoped independent implementation, and real-project trials covering both initial setup and later maintenance. A second full CLI is not a prerequisite.
 
-Until then the suite only covers the draft `0.1.0` format, and cases may be added to it.
+These are readiness criteria, not new requirements on existing `0.1.0` documents. Until a versioned change is accepted, the draft exceptions in 6.1 and the current specification remain in effect. The suite currently covers `context.json`, rule frontmatter and glob matching for `0.1.0`; export and cross-version cases remain to be added.
+
+One open design question is whether misspelled scope keys should be errors instead of ignored unknown keys. Today, `Paths` is not `paths`: it produces a warning and can leave a rule always on, as [SPEC 4.4](./SPEC.md#44-rules-optional) specifies. Any change needs a separate proposal, a compatibility decision, implementation, fixtures and migration guidance; this document does not change that behavior or introduce a new draft version.
+
+Stability is reached when the recorded evidence supports the chosen contract and no known unresolved design decision requires changing it incompatibly, not when a particular date, adoption count or marketing milestone is reached.
 
 ## 7. Conduct and collaboration
 
