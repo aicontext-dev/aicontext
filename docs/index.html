@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AIContext – one source of project context for every AI coding tool</title>
-  <meta name="description" content="AIContext is an open format and CLI for AI coding assistant project context: write it once in .aicontext/, generate AGENTS.md, CLAUDE.md, Copilot, Cursor, Windsurf and Aider files from it.">
+  <title>AIContext – maintain shared AI coding instructions</title>
+  <meta name="description" content="Maintain AI coding instructions in one place. AIContext validates sources, exports to supported tool formats and checks for stale exports in CI. Open source, MIT licensed.">
   <style>
     body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 40px auto; max-width: 900px; line-height: 1.6; padding: 0 16px; color: #111; }
     h1 { margin-bottom: 0.2em; }
@@ -26,25 +26,39 @@
 </head>
 <body>
   <h1>AIContext</h1>
-  <p class="tagline">Open format standard for AI coding assistant project context.<br>One source of truth. Every AI tool.</p>
+  <p class="tagline">Maintain AI coding instructions in one place.<br>Validate them and export to supported tool formats.</p>
+  <p>
+    <strong><a href="https://github.com/aicontext-dev/aicontext/blob/main/demos/01-basics/README.md">Try the small demo</a></strong>
+    &middot; <a href="https://github.com/aicontext-dev/aicontext/issues">Report what was confusing</a>
+  </p>
 
   <p class="status">
+    <a href="./LICENSE">MIT licensed</a>.
     The specification is a draft (<code>0.1.0-draft</code>) and the tools are <code>0.x</code>, so formats and behavior can still change.
     See the <a href="./CHANGELOG.md">changelog</a>.
+    <a href="https://github.com/aicontext-dev/aicontext/releases/latest">Download the CLI without .NET</a>.
+  </p>
+
+  <p>
+    AIContext is an open-source format and CLI for maintaining shared project instructions, generating tool-specific files,
+    and checking for stale exports in CI. Keep the source in <code>.aicontext/</code> as plain Markdown and JSON.
+    Validation and export run locally, with no AI account or model calls.
+  </p>
+  <p>
+    It manages instruction files, not agent behavior. If one short hand-written file already works for you, you may not need it.
   </p>
 
   <h2>The problem</h2>
   <p>
-    Every AI coding assistant reads its own instruction file: <code>AGENTS.md</code>, <code>CLAUDE.md</code>,
-    <code>.github/copilot-instructions.md</code>, <code>.cursor/rules/</code>, <code>.windsurf/rules/</code>,
-    <code>CONVENTIONS.md</code>. A team that uses more than one tool writes the same project knowledge several times,
-    and the copies drift apart.
+    AI coding tools use different instruction files and loading rules. If you or your team maintain the same guidance
+    in files such as <code>AGENTS.md</code>, <code>CLAUDE.md</code> and Copilot instructions,
+    a change to one copy can leave the others out of date.
   </p>
 
   <h2>The result</h2>
   <p>
     You write the knowledge once in <code>.aicontext/</code> (plain markdown), and <code>aicontext export</code>
-    generates each tool's file from it. The output is deterministic, so unchanged sources produce no diff, and CI can check that
+    generates files for your selected targets. The output is deterministic, so unchanged sources produce no diff, and CI can check that
     the generated files are up to date.
   </p>
   <div class="cols">
@@ -69,19 +83,30 @@ CLAUDE.md          &lt;- generated
   </div>
 
   <h2>Try it</h2>
-<pre><code>aicontext init --name my-project       # creates .aicontext/README.md and context.json
-# edit .aicontext/README.md: what the project is, its stack, rules that must never be broken
-aicontext validate                     # schema, recommended files, placeholders, possible secrets
-aicontext export --target all          # writes AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, ...
-aicontext export --target all --check  # in CI: exit code 1 when the generated files are out of date</code></pre>
+  <p>
+    Start with the <a href="https://github.com/aicontext-dev/aicontext/blob/main/demos/01-basics/README.md">Windows/Linux demo</a>:
+    a ready-to-copy sample and a pinned standalone CLI. No Git, .NET SDK or AI account is needed.
+    Work in a separate practice folder.
+  </p>
+  <p>After copying the sample and downloading the CLI, the workflow is:</p>
+<pre><code>validate -&gt; export -&gt; change one source rule -&gt; check detects drift -&gt; export</code></pre>
+  <p>For example, in the demo's PowerShell terminal:</p>
+<pre><code>..\tools\aicontext\aicontext.exe validate
+..\tools\aicontext\aicontext.exe export --target all
+..\tools\aicontext\aicontext.exe export --target all --check</code></pre>
+  <p>
+    The sample configures only <code>agents</code> and <code>copilot</code>, so <code>all</code> means those two targets,
+    not every supported tool. The first export prints:
+  </p>
 <pre><code># the tool prints the full path of each file; shortened here
 Created (agents): AGENTS.md
 Created (copilot): .github\copilot-instructions.md
-Created (claude): CLAUDE.md
-Created (cursor): .cursor\rules\project.mdc
-Created (windsurf): .windsurf\rules\project.md
-Created (aider): CONVENTIONS.md
-Export completed (6 changed, 0 unchanged).</code></pre>
+Export completed (2 changed, 0 unchanged).</code></pre>
+  <p>
+    The guide then shows a stale check (exit <code>1</code>), an update, and a repeated export that changes nothing.
+    These targets demonstrate file synchronization; some tools can load both files, so this is not a universal configuration recommendation.
+    Continue with <a href="https://github.com/aicontext-dev/aicontext/blob/main/demos/README.md">scoped rules or CI checks</a>.
+  </p>
 
   <h2>Is it for you?</h2>
   <div class="cols">
@@ -90,25 +115,25 @@ Export completed (6 changed, 0 unchanged).</code></pre>
       <ul>
         <li>You or your team use two or more AI coding tools, or expect to.</li>
         <li>You want project guidance reviewed in pull requests like code.</li>
-        <li>A large repository or monorepo, where scoped rules keep the always-on context small.</li>
-        <li>CI should catch drift, stray secrets and an unfinished context.</li>
+        <li>A large repository or monorepo, where scoped rules can reduce always-on content where the target supports them (<code>split</code> does not bound context size).</li>
+        <li>CI should catch stale exports and flag obvious placeholders or possible secrets.</li>
       </ul>
     </div>
     <div>
       <strong>Probably not (yet)</strong>
       <ul>
         <li>You use a single tool and a short hand-written file already works: keep it.</li>
-        <li>You expect AIContext to write or judge the content: a passing <code>validate</code> only means the structure is right and no obvious placeholder or secret was found.</li>
+        <li>You expect AIContext to write or judge the content: validation checks structure and flags obvious placeholders or possible secrets; it does not generate content or judge its usefulness.</li>
         <li>You need to enforce what an AI tool does: the context is guidance, not policy enforcement.</li>
       </ul>
     </div>
   </div>
 
   <h2>Your existing files</h2>
-  <p>AIContext does not overwrite what you already have.</p>
+  <p>AIContext protects hand-written instruction files by default.</p>
   <ul>
     <li><code>export</code> replaces only files that carry the <code>Auto-generated by aicontext export</code> header. Any other existing file is a conflict: nothing is written until you pass <code>--force</code>.</li>
-    <li><code>aicontext init</code> lists the hand-written instruction files it finds, and <code>export --dry-run</code> shows what would change. The <a href="./user-manual.md">user manual</a> has a step-by-step migration recipe (chapter 11, B).</li>
+    <li><code>aicontext init</code> lists the hand-written instruction files it finds, and <code>export --dry-run</code> shows what would change. The <a href="./docs/user-manual.md">user manual</a> has a step-by-step migration recipe (chapter 11, B).</li>
     <li>Export never writes or deletes outside the project, even through symlinks or junctions, and refuses a <code>context.json</code> that <code>validate</code> rejects.</li>
   </ul>
 
@@ -130,7 +155,7 @@ Export completed (6 changed, 0 unchanged).</code></pre>
   <ul>
     <li>The per-tool rule formats follow the vendors' documentation; they have not yet been verified against every tool in real projects.</li>
     <li>Some tools read several of these files together (for example the Local agent of Copilot in VS Code reads <code>AGENTS.md</code> and <code>CLAUDE.md</code> too). <code>aicontext status</code> shows the context size per tool and these overlaps as an estimate.</li>
-    <li>A tool does not always read its file without help: Aider only reads <code>CONVENTIONS.md</code> when you start it with <code>aider --read CONVENTIONS.md</code> (or set <code>read: CONVENTIONS.md</code> in <code>.aider.conf.yml</code>), and some editors have settings for file-based instructions (for example in VS Code with Copilot). See &ldquo;Does my tool read the generated file?&rdquo; in the <a href="./user-manual.md">user manual</a>.</li>
+    <li>A tool does not always read its file without help: Aider only reads <code>CONVENTIONS.md</code> when you start it with <code>aider --read CONVENTIONS.md</code> (or set <code>read: CONVENTIONS.md</code> in <code>.aider.conf.yml</code>), and some editors have settings for file-based instructions (for example in VS Code with Copilot). See &ldquo;Does my tool read the generated file?&rdquo; in the <a href="./docs/user-manual.md">user manual</a>.</li>
     <li>The secret lint is a heuristic and does not replace a dedicated secret scanner.</li>
   </ul>
 
@@ -139,7 +164,7 @@ Export completed (6 changed, 0 unchanged).</code></pre>
 aicontext --help</code></pre>
   <ul>
     <li><a href="https://github.com/aicontext-dev/aicontext/releases/latest">Download the CLI (no .NET required)</a></li>
-    <li><a href="./user-manual.md">User manual</a>: quick start, all commands, CI, recipes, troubleshooting</li>
+    <li><a href="./docs/user-manual.md">User manual</a>: quick start, all commands, CI, recipes, troubleshooting</li>
     <li><a href="./README.md">README</a></li>
   </ul>
 

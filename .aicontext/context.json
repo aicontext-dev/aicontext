@@ -3,7 +3,7 @@
   "specVersion": "0.1.0",
   "project": {
     "name": "aicontext",
-    "description": "Open format standard for AI coding assistant project context.",
+    "description": "Open-source format and CLI for maintaining shared AI coding instructions, exporting to supported tool formats and checking for stale exports in CI.",
     "primaryLanguage": "C#",
     "stack": [
       ".NET 9/10",
@@ -26,6 +26,6 @@
     "layout": "split"
   },
   "metadata": {
-    "lastReviewed": "2026-11-13"
+    "lastReviewed": "2026-11-15"
   }
 }

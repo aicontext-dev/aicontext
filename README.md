@@ -1,25 +1,37 @@
 # aicontext
 
-> Open format standard for AI coding assistant project context.
-> One source of truth. Every AI tool.
+> Maintain AI coding instructions in one place.
+> Validate them and export to supported tool formats.
 
-**Specification and tooling — work in progress.**
-⭐ Watch/Star this repo for updates.
+**[Try the small demo](./demos/01-basics/README.md)** ·
+[Report what was confusing](https://github.com/aicontext-dev/aicontext/issues)
+
+**[MIT licensed](./LICENSE) · Draft specification (`0.1.0-draft`) · Pre-1.0 tooling.**
+[Download the CLI without .NET](https://github.com/aicontext-dev/aicontext/releases/latest).
 
 ## What is this?
 
-`.aicontext/` is an open directory format for storing structured
-project knowledge that AI coding assistants can use.
+AIContext is an open-source format and CLI for maintaining shared project
+instructions, generating tool-specific files, and checking for stale exports
+in CI. Keep the source in `.aicontext/` as plain Markdown and JSON.
+Validation and export run locally, with no AI account or model calls.
 
-Works with: GitHub Copilot · Cursor · Claude Code · Windsurf · Devin · Aider · any tool that reads `AGENTS.md`
+It manages instruction files, not agent behavior. If one short hand-written
+file already works for you, you may not need it.
+
+Supported export formats include `AGENTS.md`, GitHub Copilot, Cursor,
+Claude Code, Windsurf, Devin and Aider. See the [limits below](#supported-tools-and-their-limits)
+before choosing targets.
 
 ## The problem
 
-Every AI coding assistant reads its own instruction file: `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/`, `.windsurf/rules/`, `CONVENTIONS.md`. A team that uses more than one tool writes the same project knowledge several times, and the copies drift apart.
+AI coding tools use different instruction files and loading rules. If you or
+your team maintain the same guidance in files such as `AGENTS.md`, `CLAUDE.md`
+and Copilot instructions, a change to one copy can leave the others out of date.
 
 ## The result
 
-You write the knowledge once in `.aicontext/` (plain markdown) and `aicontext export` generates each tool's file from it:
+You write the knowledge once in `.aicontext/` (plain markdown) and `aicontext export` generates files for your selected targets:
 
 ```text
 Before: the same text kept by hand        After: one source, generated files
@@ -33,26 +45,40 @@ The output is deterministic (no timestamps, always LF), so unchanged sources pro
 
 ## Try it
 
-```powershell
-aicontext init --name my-project       # creates .aicontext/README.md and context.json
-# edit .aicontext/README.md: what the project is, its stack, rules that must never be broken
-aicontext validate                     # schema, recommended files, placeholders, possible secrets
-aicontext export --target all          # writes AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, ...
-aicontext export --target all --check  # in CI: exit code 1 when the generated files are out of date
+Start with the [Windows/Linux demo](./demos/01-basics/README.md). It includes
+a ready-to-copy sample and a pinned standalone CLI, so you do not need Git,
+the .NET SDK or an AI account. Work in a separate practice folder.
+
+After copying the sample and downloading the CLI, the workflow is:
+
+```text
+validate -> export -> change one source rule -> check detects drift -> export
 ```
+
+For example, in the demo's PowerShell terminal:
+
+```powershell
+..\tools\aicontext\aicontext.exe validate
+..\tools\aicontext\aicontext.exe export --target all
+..\tools\aicontext\aicontext.exe export --target all --check
+```
+
+The sample configures only `agents` and `copilot`, so `all` means those two
+targets, not every supported tool. The first export prints:
 
 ```text
 # the tool prints the full path of each file; shortened here
 Created (agents): AGENTS.md
 Created (copilot): .github\copilot-instructions.md
-Created (claude): CLAUDE.md
-Created (cursor): .cursor\rules\project.mdc
-Created (windsurf): .windsurf\rules\project.md
-Created (aider): CONVENTIONS.md
-Export completed (6 changed, 0 unchanged).
+Export completed (2 changed, 0 unchanged).
 ```
 
-Install and the full guide: [CLI section below](#cli-mvp) and the [user manual](./docs/user-manual.md).
+The guide then shows a stale check (exit `1`), an update, and a repeated export
+that changes nothing. These targets demonstrate file synchronization; some
+tools can load both files, so this is not a universal configuration recommendation.
+
+Continue with [scoped rules or CI checks](./demos/README.md).
+For your own project, see [installation](#cli-mvp) and the [user manual](./docs/user-manual.md).
 
 ## Is it for you?
 
@@ -60,18 +86,18 @@ A good fit:
 
 - you or your team use two or more AI coding tools, or expect to;
 - you want project guidance reviewed in pull requests like code;
-- a large repository or monorepo, where scoped rules keep the always-on context small (the `split` layout, nested `AGENTS.md`);
-- CI should catch drift, stray secrets and an unfinished context.
+- a large repository or monorepo, where scoped rules can reduce always-on content where the target supports them (`split` does not bound context size);
+- CI should catch stale exports and flag obvious placeholders or possible secrets.
 
 Probably not (yet):
 
 - you use a single tool and a short hand-written file already works for you: keep it;
-- you expect AIContext to write or extract the context for you: it does not generate or judge content, and a passing `validate` only means the structure is right and no obvious placeholder or secret was found;
+- you expect AIContext to write or extract the context for you: validation checks structure and flags obvious placeholders or possible secrets; it does not generate content or judge its usefulness;
 - you need to enforce what an AI tool does: the context is guidance, and policy enforcement is a non-goal of the specification.
 
 ## Your existing files
 
-AIContext does not overwrite what you already have.
+AIContext protects hand-written instruction files by default.
 
 - `export` replaces only files that carry the `Auto-generated by aicontext export` header. Any other existing file is a conflict: nothing is written (not even the other files) until you pass `--force`.
 - `aicontext init` lists the hand-written instruction files it finds, and `aicontext export --dry-run` shows what would change. The user manual has a step-by-step migration recipe (chapter 11, B); git keeps your originals.
@@ -232,6 +258,8 @@ Use the shared design-system components.
 - `exports.nestedAgents: true` (split layout only) writes rules scoped to an exact directory (`services/billing/**`) to `services/billing/AGENTS.md` instead of the root `AGENTS.md`, so tools that only read `AGENTS.md` (Codex, Jules, Junie, ...) load them only when working there. Rules with other patterns (`**/*.ts`, `src/ui/**/*.tsx`, a bare `src/ui` or `src/ui/`) or non-existent directories stay in the root file; `aicontext status` shows which and why. Note that Copilot, Cursor and Devin also read `AGENTS.md`, so combining this with their native rule targets can load a rule twice.
 
 ## Website
+
+Watch or star the repository if you want to follow updates.
 
 GitHub Pages deployment workflow:
 

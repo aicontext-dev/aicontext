@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using AIContext;
+using AIContext.Cli;
 using Xunit;
 
 namespace AIContext.Tests;
@@ -142,6 +143,126 @@ public sealed class DocumentationExamplesTests : IDisposable
             .Select(file => Path.GetRelativePath(_project, file) + "|" + File.ReadAllText(file))
             .Order(StringComparer.Ordinal)
             .ToList();
+
+    private string CopyDemo(string name)
+    {
+        var source = Path.Combine(AppContext.BaseDirectory, "demos", name, "project");
+        Assert.True(Directory.Exists(source), $"The demo was not copied to the test output: {source}");
+        var destination = InProject(name);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(destination, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+        return destination;
+    }
+
+    private static string RunDemo(string project, int expectedExitCode, params string[] args)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var exitCode = CliApp.Run(args, output, error, project);
+        var text = output.ToString() + error.ToString();
+        Assert.True(exitCode == expectedExitCode, $"Expected {expectedExitCode}, got {exitCode}:\n{text}");
+        return text;
+    }
+
+    private static string[] DemoSnapshot(string project) =>
+        Directory.EnumerateFiles(project, "*", SearchOption.AllDirectories)
+            .Order(StringComparer.Ordinal)
+            .Select(file => $"{file}|{File.ReadAllText(file)}|{File.GetLastWriteTimeUtc(file).Ticks}")
+            .ToArray();
+
+    private static void ChangeDemoRule(string project)
+    {
+        var file = Path.Combine(project, ".aicontext", "constraints.md");
+        var text = File.ReadAllText(file);
+        Assert.Contains("Document the expected output for each command example.", text);
+        File.WriteAllText(file, text.Replace(
+            "Document the expected output for each command example.",
+            "Document the expected output and exit code for each command example.",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Demo_Basics_DetectsDriftAndPreservesFilesDuringChecksAndRepeatedExports()
+    {
+        var project = CopyDemo("01-basics");
+        Assert.Contains("Core profile", RunDemo(project, 0, "validate"));
+        Assert.Contains("2 changed", RunDemo(project, 0, "export", "--target", "all"));
+        RunDemo(project, 0, "export", "--target", "all", "--check");
+
+        ChangeDemoRule(project);
+        var stale = DemoSnapshot(project);
+        Assert.Contains("out of date (2 file(s))", RunDemo(project, 1, "export", "--target", "all", "--check"));
+        Assert.Equal(stale, DemoSnapshot(project));
+
+        Assert.Contains("2 changed", RunDemo(project, 0, "export", "--target", "all"));
+        foreach (var file in new[] { "AGENTS.md", Path.Combine(".github", "copilot-instructions.md") })
+            Assert.Contains("expected output and exit code", File.ReadAllText(Path.Combine(project, file)));
+
+        var updated = DemoSnapshot(project);
+        RunDemo(project, 0, "export", "--target", "all", "--check");
+        Assert.Contains("0 changed, 2 unchanged", RunDemo(project, 0, "export", "--target", "all"));
+        Assert.Equal(updated, DemoSnapshot(project));
+    }
+
+    [Fact]
+    public void Demo_ScopedRules_PreviewsWithoutWritingAndPreservesTargetSpecificActivation()
+    {
+        var project = CopyDemo("02-scoped-rules");
+        RunDemo(project, 0, "validate");
+        Assert.Contains("2 changed", RunDemo(project, 0, "export", "--target", "all"));
+        var config = Path.Combine(project, ".aicontext", "context.json");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("\"single\"", "\"split\"", StringComparison.Ordinal));
+        var before = DemoSnapshot(project);
+        Assert.Contains("5 file(s) would change", RunDemo(project, 0, "export", "--target", "all", "--dry-run"));
+        Assert.Equal(before, DemoSnapshot(project));
+
+        Assert.Contains("5 changed", RunDemo(project, 0, "export", "--target", "all"));
+        var copilot = File.ReadAllText(Path.Combine(project, ".github", "instructions", "aicontext-docs.instructions.md"));
+        Assert.Contains("applyTo: \"docs/**\"", copilot);
+        Assert.DoesNotContain("\ndescription:", copilot);
+        Assert.Contains("Description: Guidance for documentation pages", copilot);
+        Assert.Contains("globs: docs/**",
+            File.ReadAllText(Path.Combine(project, ".cursor", "rules", "aicontext-docs.mdc")));
+        var copilotMain = File.ReadAllText(Path.Combine(project, ".github", "copilot-instructions.md"));
+        var cursorMain = File.ReadAllText(Path.Combine(project, ".cursor", "rules", "project.mdc"));
+        Assert.DoesNotContain("Start each documentation page", copilotMain);
+        Assert.DoesNotContain("Start each documentation page", cursorMain);
+        Assert.Contains("Use when: Checklist for reviewing documentation changes", copilotMain);
+        Assert.DoesNotContain("Check that documented commands", cursorMain);
+        var review = File.ReadAllText(Path.Combine(project, ".cursor", "rules", "aicontext-review.mdc"));
+        Assert.Contains("description: \"Checklist for reviewing documentation changes\"", review);
+        Assert.DoesNotContain("globs:", review);
+        RunDemo(project, 0, "export", "--target", "all", "--check");
+    }
+
+    [Fact]
+    public void Demo_CiChecks_DistinguishesPlaceholderWarningsFromStaleExports()
+    {
+        var project = CopyDemo("03-ci-drift-check");
+        Assert.Contains("Extended profile", RunDemo(project, 0, "validate", "--strict"));
+        Assert.Contains("1 changed", RunDemo(project, 0, "export", "--target", "all"));
+        RunDemo(project, 0, "export", "--target", "all", "--check");
+        var readme = Path.Combine(project, ".aicontext", "README.md");
+        var original = File.ReadAllText(readme);
+        File.AppendAllText(readme, "\nTODO: Document the review checklist.\n");
+        var unfinished = DemoSnapshot(project);
+        Assert.Contains("placeholder", RunDemo(project, 0, "validate"));
+        Assert.Contains("placeholder", RunDemo(project, 1, "validate", "--strict"));
+        Assert.Equal(unfinished, DemoSnapshot(project));
+        File.WriteAllText(readme, original);
+        ChangeDemoRule(project);
+        RunDemo(project, 0, "validate", "--strict");
+        var stale = DemoSnapshot(project);
+        Assert.Contains("out of date (1 file(s))", RunDemo(project, 1, "export", "--target", "all", "--check"));
+        Assert.Equal(stale, DemoSnapshot(project));
+        Assert.Contains("1 changed", RunDemo(project, 0, "export", "--target", "all"));
+        RunDemo(project, 0, "validate", "--strict");
+        RunDemo(project, 0, "export", "--target", "all", "--check");
+    }
 
     // The CLI projects target net9.0 and net10.0, and `dotnet run` refuses a project that targets several frameworks
     // unless one is named. CI runs the same form (see validate-aicontext.yml).

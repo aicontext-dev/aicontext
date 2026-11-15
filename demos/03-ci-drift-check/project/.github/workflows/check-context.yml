@@ -1,0 +1,34 @@
+name: Check AIContext exports
+
+on: [pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  check-context:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v7
+
+      - name: Install pinned AIContext CLI
+        env:
+          AICONTEXT_SHA256: afa23c7064a2cc76674ee678a445dde7cce05ca0006a8756e8c0458fb824e2c1
+        run: |
+          mkdir -p "$RUNNER_TEMP/aicontext"
+          curl -fsSL --output "$RUNNER_TEMP/aicontext-linux-x64.tar.gz" \
+            https://github.com/aicontext-dev/aicontext/releases/download/v0.7.0/aicontext-linux-x64.tar.gz
+          echo "$AICONTEXT_SHA256  $RUNNER_TEMP/aicontext-linux-x64.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/aicontext-linux-x64.tar.gz" -C "$RUNNER_TEMP/aicontext"
+          chmod +x "$RUNNER_TEMP/aicontext/aicontext"
+          "$RUNNER_TEMP/aicontext/aicontext" --version
+
+      - name: Validate source instructions
+        run: '"$RUNNER_TEMP/aicontext/aicontext" validate --strict'
+
+      - name: Check generated instructions
+        run: '"$RUNNER_TEMP/aicontext/aicontext" export --target all --check'

@@ -5,6 +5,8 @@ on:
     branches: ["main"]
     paths:
       - "docs/**"
+      - "demos/**"
+      - "LICENSE"
       - "SPEC.md"
       - "README.md"
       - "GOVERNANCE.md"
@@ -43,13 +45,16 @@ jobs:
           cp docs/CNAME _site/CNAME
           cp docs/spec/index.html _site/spec/index.html
           cp docs/user-manual.md _site/user-manual.md
+          cp docs/user-manual.md _site/docs/user-manual.md
           cp docs/decisions.md _site/docs/decisions.md
           cp README.md _site/README.md
+          cp LICENSE _site/LICENSE
           cp SPEC.md _site/SPEC.md
           cp GOVERNANCE.md _site/GOVERNANCE.md
           cp SECURITY.md _site/SECURITY.md
           cp CHANGELOG.md _site/CHANGELOG.md
           cp -r conformance _site/conformance
+          cp -r demos _site/demos
           cp schema/v1/context.schema.json _site/schema/v1/context.schema.json
           touch _site/.nojekyll
 
@@ -57,6 +62,7 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+          include-hidden-files: true
 
   deploy:
     needs: build
