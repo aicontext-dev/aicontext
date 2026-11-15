@@ -24,3 +24,9 @@ CI in your own repository is optional.
 
 For reference documentation rather than a guided exercise, see the
 [user manual](../docs/user-manual.md).
+
+Tried a demo, or decided AIContext was not for you? Share your experience in
+[First-use feedback](https://github.com/aicontext-dev/aicontext/issues/31).
+A few sentences are enough; negative feedback is welcome too. Do not include
+private code, personal paths or secrets. Suspected vulnerabilities belong in the
+[private security reporting process](../SECURITY.md), not the public feedback issue.

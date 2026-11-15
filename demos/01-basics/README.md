@@ -388,7 +388,7 @@ or [strict validation and CI checks](../03-ci-drift-check/README.md).
 To create sources for your own project rather than copy a sample, see
 [`init` in the quick start](../../docs/user-manual.md#step-2-create-the-skeleton).
 You can also explore [supported tools and limits](../../README.md#supported-tools-and-their-limits)
-or [report what was confusing](https://github.com/aicontext-dev/aicontext/issues).
+or [report what was confusing](https://github.com/aicontext-dev/aicontext/issues/31).
 Do not post private code, personal paths, or secrets. Security reports belong
 in the [private reporting channel](../../SECURITY.md), not a public issue.
 

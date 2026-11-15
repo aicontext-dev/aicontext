@@ -4,7 +4,7 @@
 > Validate them and export to supported tool formats.
 
 **[Try the small demo](./demos/01-basics/README.md)** ·
-[Report what was confusing](https://github.com/aicontext-dev/aicontext/issues)
+[Report what was confusing](https://github.com/aicontext-dev/aicontext/issues/31)
 
 **[MIT licensed](./LICENSE) · Draft specification (`0.1.0-draft`) · Pre-1.0 tooling.**
 [Download the CLI without .NET](https://github.com/aicontext-dev/aicontext/releases/latest).
