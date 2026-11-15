@@ -8,6 +8,8 @@ Versions in this file are **tool/package versions** (`AIContext`, `AIContext.CLI
 
 ### Documentation
 
+- Added three copyable, source-only demos using the pinned 0.7.0 CLI: two-target drift, scoped/on-demand layouts, and strict validation with a read-only CI workflow. Demo scenarios are covered by documentation tests and linked from the README and website; GitHub Pages includes the sample files.
+- Aligned the README, website, user manual and this repository's context around maintaining instructions, supported exports and CI drift checks, with a demo-first entry point and explicit limits rather than a promise of identical agent behavior. No format or CLI behavior changes.
 - Shortened this repository's `.aicontext/decisions.md` to operational summaries of D1-D22 and preserved their full rationale and history in [Project decisions](./docs/decisions.md). Regenerated tool instructions carry the summaries instead of the full history. This changes this repository's context, not the export algorithm or the file format.
 - Documented the single-maintainer decision process and the evidence needed before declaring the specification stable. Clarified the distinction between the draft format, schema URL, JSON Schema dialect and tool versions. The schema, `specVersion` (`0.1.0`) and rule parsing behavior, including the treatment of `Paths`, are unchanged.
 

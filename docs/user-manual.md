@@ -21,11 +21,15 @@
 13. [How to write good context](#13-how-to-write-good-context)
 14. [Glossary](#14-glossary)
 
+Prefer a guided exercise? The [demo catalog](https://github.com/aicontext-dev/aicontext/blob/main/demos/README.md) includes
+ready-to-copy projects for basic exports, scoped rules, and strict CI checks,
+with shared instructions for Windows and Linux.
+
 ---
 
 ## 1. What AIContext is and why use it
 
-AI coding assistants (GitHub Copilot, Cursor, Claude Code, Windsurf, Aider, …) need to know **how your project works**: what its architecture is, what must not be done, which conventions apply. Each tool uses **its own file** for this:
+AI coding assistants (GitHub Copilot, Cursor, Claude Code, Windsurf, Aider, …) need to know **how your project works**: what its architecture is, what must not be done, which conventions apply. Tools support different instruction files and loading rules, including:
 
 | Tool | File |
 |---|---|
@@ -36,9 +40,9 @@ AI coding assistants (GitHub Copilot, Cursor, Claude Code, Windsurf, Aider, …)
 | Aider | `CONVENTIONS.md` |
 | Many others (Codex, Copilot, …) | `AGENTS.md` |
 
-If a team uses several tools, the same information is written and maintained several times, and the copies drift apart over time.
+If you or your team maintain the same guidance for several tools, the copies can drift apart over time.
 
-**AIContext solves this:** you write the information **once** into the `.aicontext/` directory (plain markdown), and the `aicontext export` command generates the files for all tools from it.
+**AIContext helps manage these copies:** you write the information **once** into the `.aicontext/` directory (plain markdown), and the `aicontext export` command generates files for your selected supported targets. Validation and export run locally, without an AI account or model calls.
 
 ```
 .aicontext/   (written by you, single source of truth)
@@ -50,11 +54,11 @@ AGENTS.md   CLAUDE.md   .github/copilot-instructions.md   .cursor/rules/…   �
 
 What else you get:
 
-- **Checks** (`validate`): missing files, configuration errors, accidentally pasted passwords and keys.
-- **Context savings**: large projects can split their context so that it is not all loaded on every question (chapter 7).
-- **Overview** (`status`): how much context each tool loads and whether the exports are up to date.
+- **Checks** (`validate`): missing files, configuration errors, obvious placeholders and possible secrets; secret detection is heuristic, not comprehensive.
+- **Context organization**: scoped rules can reduce always-on content where the target supports them; `split` does not guarantee a size limit (chapter 7).
+- **Overview** (`status`): estimated context sizes and whether the exports are up to date, not a measurement of a live agent session.
 
-What AIContext is **not**: it does not replace documentation or source code. It is a short, human-readable "project guide" for AI.
+What AIContext is **not**: it does not replace documentation or source code, and it does not guarantee agent behavior. If one short hand-written instruction file already works for you, you may not need it.
 
 ---
 
