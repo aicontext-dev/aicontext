@@ -23,6 +23,10 @@ Supported export formats include `AGENTS.md`, GitHub Copilot, Cursor,
 Claude Code, Windsurf, Devin and Aider. See the [limits below](#supported-tools-and-their-limits)
 before choosing targets.
 
+Prefer a quick introduction? [Watch the animated overview on Vimeo](https://vimeo.com/1249768593)
+(1:30, AIContext 0.7.0). This silent, AI-generated animation uses illustrative
+terminal sequences, not live CLI recordings.
+
 ## The problem
 
 AI coding tools use different instruction files and loading rules. If you or

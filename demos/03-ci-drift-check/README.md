@@ -5,6 +5,11 @@ or a source change whose generated files were not updated. This demo shows how
 to detect each one, first locally and then with a prepared GitHub Actions
 workflow.
 
+Prefer watching? [Watch the animated walkthrough on Vimeo](https://vimeo.com/1249777305)
+(2:10). This silent, AI-generated animation follows the written guide, not a
+recording of live commands or a hosted CI run. Use the steps below to run the
+demo yourself.
+
 **You can finish the local exercise without a GitHub account or Git.**
 The optional hosted workflow needs your own GitHub repository. Do not publish
 anything just to follow the local steps.

@@ -7,6 +7,11 @@ split it into general guidance, a path-scoped rule, and an on-demand checklist.
 You will preview the change without writing anything and inspect where each
 tool's files put the content. No AI account or application runtime is needed.
 
+Prefer watching? [Watch the animated walkthrough on Vimeo](https://vimeo.com/1249776219)
+(2:18). This silent, AI-generated animation follows the written guide; terminal
+sequences are illustrative, not live CLI recordings. Use the steps below to run
+the demo yourself.
+
 ## 1. Prepare a fresh practice folder
 
 If needed, [download the repository and CLI as in demo 01](../01-basics/README.md#1-copy-the-sample-project).
