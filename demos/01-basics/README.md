@@ -7,6 +7,11 @@ In this demo, you will generate both files from one source, change a rule
 yourself, and see how AIContext detects and fixes the mismatch.
 Run one short command at a time and inspect the results in your text editor.
 
+Prefer watching? [Watch the animated walkthrough on Vimeo](https://vimeo.com/1249775356)
+(2:31). This silent, AI-generated animation follows the written guide; terminal
+sequences are illustrative, not live CLI recordings. Use the steps below to run
+the demo yourself.
+
 ## Before you start
 
 You need a file manager, a plain-text editor such as VS Code or Notepad,
